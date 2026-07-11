@@ -33,6 +33,7 @@ import {
   MobilePageTitle,
   MobilePageTrigger,
 } from "../mobile/MobilePage";
+import ClassificationCurationBadge from "./ClassificationCurationBadge";
 
 type ClassificationCardProps = {
   className?: string;
@@ -44,6 +45,8 @@ type ClassificationCardProps = {
   i18nLibrary: string;
   showArea?: boolean;
   count?: number;
+  duplicateGroupOutline?: string;
+  showInteractionHint?: boolean;
   onClick: (data: ClassificationItemData, meta: boolean) => void;
   children?: React.ReactNode;
 };
@@ -61,6 +64,8 @@ export const ClassificationCard = forwardRef<
     i18nLibrary,
     showArea = true,
     count,
+    duplicateGroupOutline,
+    showInteractionHint = false,
     onClick,
     children,
   },
@@ -107,10 +112,14 @@ export const ClassificationCard = forwardRef<
         className,
         selected
           ? "shadow-selected outline-selected"
-          : "outline-transparent duration-500",
-        clickable && "cursor-pointer",
+          : duplicateGroupOutline ?? "outline-transparent duration-500",
+        clickable && !selected && "cursor-pointer",
       )}
       onClick={(e) => {
+        if (!clickable) {
+          return;
+        }
+
         const isMeta = e.metaKey || e.ctrlKey;
         if (isMeta) {
           e.stopPropagation();
@@ -118,32 +127,78 @@ export const ClassificationCard = forwardRef<
         onClick(data, isMeta);
       }}
       onContextMenu={(e) => {
+        if (!clickable) {
+          return;
+        }
+
         e.preventDefault();
         e.stopPropagation();
         onClick(data, true);
       }}
     >
-      <img
-        ref={imgRef}
-        className={cn(
-          "absolute bottom-0 left-0 right-0 top-0 size-full",
-          imgClassName,
-          isMobile && "w-full",
-        )}
-        style={
-          isIOS
-            ? {
-                WebkitUserSelect: "none",
-                WebkitTouchCallout: "none",
+      {showInteractionHint ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <img
+              ref={imgRef}
+              className={cn(
+                "absolute bottom-0 left-0 right-0 top-0 size-full cursor-pointer",
+                imgClassName,
+                isMobile && "w-full",
+              )}
+              style={
+                isIOS
+                  ? {
+                      WebkitUserSelect: "none",
+                      WebkitTouchCallout: "none",
+                    }
+                  : undefined
               }
-            : undefined
-        }
-        draggable={false}
-        loading="lazy"
-        onLoad={() => setImageLoaded(true)}
-        src={`${baseUrl}${data.filepath}`}
-      />
+              draggable={false}
+              loading="lazy"
+              onLoad={() => setImageLoaded(true)}
+              src={`${baseUrl}${data.filepath}`}
+              alt=""
+            />
+          </TooltipTrigger>
+          <TooltipPortal>
+            <TooltipContent className="text-sm">
+              {isDesktop
+                ? t("curation.interactionHint")
+                : t("curation.interactionHintMobile")}
+            </TooltipContent>
+          </TooltipPortal>
+        </Tooltip>
+      ) : (
+        <img
+          ref={imgRef}
+          className={cn(
+            "absolute bottom-0 left-0 right-0 top-0 size-full",
+            imgClassName,
+            isMobile && "w-full",
+          )}
+          style={
+            isIOS
+              ? {
+                  WebkitUserSelect: "none",
+                  WebkitTouchCallout: "none",
+                }
+              : undefined
+          }
+          draggable={false}
+          loading="lazy"
+          onLoad={() => setImageLoaded(true)}
+          src={`${baseUrl}${data.filepath}`}
+        />
+      )}
       <ImageShadowOverlay upperClassName="z-0" lowerClassName="h-[30%] z-0" />
+      {data.similarity?.suggestedAction && (
+        <ClassificationCurationBadge
+          predictedLabel={data.name}
+          confidence={data.score}
+          similarity={data.similarity}
+        />
+      )}
       {count && (
         <div className="absolute right-2 top-2 flex flex-row items-center gap-1">
           <div className="text-gray-200">{count}</div>{" "}
@@ -182,8 +237,34 @@ export const ClassificationCard = forwardRef<
               {Math.round(data.score * 100)}%
             </div>
           )}
+          {data.metadata?.confidenceAtAdd != undefined && (
+            <div className="text-[10px] leading-tight text-white/80">
+              {data.metadata.relabeled
+                ? t("metadata.relabeled", {
+                    from: data.metadata.predictedLabelAtAdd,
+                    fromScore: Math.round(
+                      (data.metadata.confidenceAtAdd ?? 0) * 100,
+                    ),
+                    to: data.metadata.assignedLabel,
+                  })
+                : t("metadata.addedConfidence", {
+                    score: Math.round(data.metadata.confidenceAtAdd * 100),
+                  })}
+            </div>
+          )}
+          {data.metadata?.addedAt && data.score == undefined && (
+            <div className="text-[10px] leading-tight text-white/80">
+              <TimeAgo
+                time={new Date(data.metadata.addedAt).getTime()}
+                dense
+              />
+            </div>
+          )}
         </div>
-        <div className="flex flex-row items-start justify-end gap-5 md:gap-2">
+        <div
+          className="relative z-20 flex flex-row items-start justify-end gap-5 md:gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
           {children}
         </div>
       </div>

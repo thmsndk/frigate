@@ -12,7 +12,12 @@ import { cn } from "@/lib/utils";
 import { DualThumbSlider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { useTranslation } from "react-i18next";
-import { TrainFilter } from "@/types/classification";
+import { TrainFilter, SimilarityPreset } from "@/types/classification";
+import {
+  CURATION_FILTER_PRESETS,
+  getCurationBadgePresentation,
+  suggestedActionForPreset,
+} from "@/utils/classificationCurationUtil";
 
 type TrainFilterDialogProps = {
   filter?: TrainFilter;
@@ -45,7 +50,12 @@ export default function TrainFilterDialog({
       currentFilter &&
       (currentFilter.classes ||
         (currentFilter.min_score ?? 0) > 0.5 ||
-        (currentFilter.max_score ?? 1) < 1),
+        (currentFilter.max_score ?? 1) < 1 ||
+        currentFilter.similarity_preset != undefined ||
+        currentFilter.min_similarity != undefined ||
+        currentFilter.max_similarity != undefined ||
+        (currentFilter.similar_to_class != undefined &&
+          currentFilter.similar_to_class.length > 0)),
     [currentFilter],
   );
 
@@ -77,6 +87,16 @@ export default function TrainFilterDialog({
         maxScore={currentFilter.max_score}
         setScoreRange={(min, max) =>
           setCurrentFilter({ ...currentFilter, min_score: min, max_score: max })
+        }
+      />
+      <SimilarityFilterContent
+        allClasses={filterValues.classes}
+        preset={currentFilter.similarity_preset}
+        minSimilarity={currentFilter.min_similarity}
+        maxSimilarity={currentFilter.max_similarity}
+        similarToClass={currentFilter.similar_to_class}
+        updateFilter={(updates) =>
+          setCurrentFilter({ ...currentFilter, ...updates })
         }
       />
       {isDesktop && <DropdownMenuSeparator />}
@@ -249,6 +269,168 @@ export function ScoreFilterContent({
             }
           }}
         />
+      </div>
+    </div>
+  );
+}
+
+type SimilarityFilterContentProps = {
+  allClasses?: string[];
+  preset?: SimilarityPreset;
+  minSimilarity?: number;
+  maxSimilarity?: number;
+  similarToClass?: string;
+  updateFilter: (updates: Partial<TrainFilter>) => void;
+};
+export function SimilarityFilterContent({
+  allClasses,
+  preset,
+  minSimilarity,
+  maxSimilarity,
+  similarToClass,
+  updateFilter,
+}: SimilarityFilterContentProps) {
+  const { t } = useTranslation(["components/filter", "views/classificationModel"]);
+
+  const showAdvanced =
+    similarToClass != undefined ||
+    (minSimilarity ?? 0) > 0 ||
+    (maxSimilarity ?? 1) < 1;
+
+  return (
+    <div className="overflow-x-hidden">
+      <DropdownMenuSeparator className="mb-3" />
+      <div className="mb-1 text-lg">{t("similarity.label")}</div>
+      <p className="mb-3 text-xs leading-snug text-muted-foreground">
+        {t("similarity.hint")}
+      </p>
+      <div className="mt-2.5 flex flex-col gap-3">
+        {CURATION_FILTER_PRESETS.map((item) => {
+          const presentation = getCurationBadgePresentation(
+            suggestedActionForPreset(item),
+          );
+          if (!presentation) {
+            return null;
+          }
+
+          const Icon = presentation.Icon;
+          const badgeLabel = t(`curation.badge.${presentation.kind}`, {
+            ns: "views/classificationModel",
+            className: "",
+          });
+
+          return (
+            <div
+              key={item}
+              className="flex items-start justify-between gap-2 rounded-md border border-secondary/60 px-2 py-1.5"
+            >
+              <div className="min-w-0 flex-1">
+                <Label
+                  htmlFor={`similarity-preset-${item}`}
+                  className="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-primary"
+                >
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] font-medium",
+                      presentation.className,
+                    )}
+                  >
+                    <Icon className="size-3 shrink-0" />
+                    {badgeLabel}
+                  </span>
+                </Label>
+                <p className="mt-1 pl-0.5 text-xs leading-snug text-muted-foreground">
+                  {t(`similarity.presets.${item}.desc`)}
+                </p>
+              </div>
+              <Switch
+                id={`similarity-preset-${item}`}
+                className="mt-1 shrink-0"
+                checked={preset === item}
+                onCheckedChange={(isChecked) => {
+                  updateFilter({
+                    similarity_preset: isChecked ? item : undefined,
+                  });
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-4">
+        <div className="mb-2 text-sm font-medium text-primary">
+          {t("similarity.advanced")}
+        </div>
+        {allClasses && allClasses.length > 0 && (
+          <div className="mb-4">
+            <Label className="mb-1 block text-xs text-muted-foreground">
+              {t("similarity.similarToClass")}
+            </Label>
+            <select
+              className="w-full rounded-md border border-secondary bg-background px-2 py-1 text-sm"
+              value={similarToClass ?? ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                updateFilter({
+                  similar_to_class: value.length > 0 ? value : undefined,
+                });
+              }}
+            >
+              <option value="">{t("similarity.anyClass")}</option>
+              {allClasses.map((item) => (
+                <option key={item} value={item}>
+                  {item.replaceAll("_", " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div>
+          <Label className="mb-2 block text-xs text-muted-foreground">
+            {t("similarity.range")}
+          </Label>
+          <div className="flex items-center gap-1">
+            <Input
+              className="w-14 text-center"
+              inputMode="numeric"
+              value={Math.round((minSimilarity ?? 0) * 100)}
+              onChange={(e) => {
+                const value = e.target.value;
+
+                if (value) {
+                  updateFilter({ min_similarity: parseInt(value) / 100.0 });
+                }
+              }}
+            />
+            <DualThumbSlider
+              className="mx-2 w-full"
+              min={0}
+              max={1.0}
+              step={0.01}
+              value={[minSimilarity ?? 0, maxSimilarity ?? 1.0]}
+              onValueChange={([min, max]) =>
+                updateFilter({ min_similarity: min, max_similarity: max })
+              }
+            />
+            <Input
+              className="w-14 text-center"
+              inputMode="numeric"
+              value={Math.round((maxSimilarity ?? 1.0) * 100)}
+              onChange={(e) => {
+                const value = e.target.value;
+
+                if (value) {
+                  updateFilter({ max_similarity: parseInt(value) / 100.0 });
+                }
+              }}
+            />
+          </div>
+          {showAdvanced && preset == undefined && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t("similarity.rangeHint")}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

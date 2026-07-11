@@ -61,10 +61,22 @@ import TrainFilterDialog from "@/components/overlay/dialog/TrainFilterDialog";
 import useApiFilter from "@/hooks/use-api-filter";
 import {
   ClassificationDatasetResponse,
+  ClassificationImageMetadata,
   ClassificationItemData,
   ClassifiedEvent,
   TrainFilter,
+  TrainSuggestionsResponse,
 } from "@/types/classification";
+import {
+  matchesSimilarityFilter,
+  metadataFromApi,
+  suggestionToSimilarityInfo,
+  buildCurationTooltipValues,
+  buildRecentDuplicateGroupOutlineMap,
+  getCurationTooltipKey,
+  getTileDecorationOutline,
+} from "@/utils/classificationCurationUtil";
+import { baseUrl } from "@/api/baseUrl";
 import {
   ClassificationCard,
   GroupedClassificationCard,
@@ -136,16 +148,30 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
     useSWR<ClassificationDatasetResponse>(
       `classification/${model.name}/dataset`,
     );
+  const { data: suggestionsResponse, mutate: refreshSuggestions } =
+    useSWR<TrainSuggestionsResponse>(
+      `classification/${model.name}/train/suggestions`,
+    );
 
   const dataset = datasetResponse?.categories || {};
   const trainingMetadata = datasetResponse?.training_metadata;
+  const imageMetadata = datasetResponse?.image_metadata;
+
+  const suggestionsByFilename = useMemo(() => {
+    const map = new Map<string, TrainSuggestionsResponse["suggestions"][number]>();
+    suggestionsResponse?.suggestions.forEach((item) => {
+      map.set(item.filename, item);
+    });
+    return map;
+  }, [suggestionsResponse]);
 
   const [trainFilter, setTrainFilter] = useApiFilter<TrainFilter>();
 
   const refreshAll = useCallback(() => {
     refreshTrain();
     refreshDataset();
-  }, [refreshTrain, refreshDataset]);
+    refreshSuggestions();
+  }, [refreshTrain, refreshDataset, refreshSuggestions]);
 
   // image multiselect
 
@@ -525,6 +551,7 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
           classes={Object.keys(dataset || {})}
           trainImages={trainImages || []}
           trainFilter={trainFilter}
+          suggestionsByFilename={suggestionsByFilename}
           selectedImages={selectedImages}
           onRefresh={refreshAll}
           onClickImages={onClickImages}
@@ -536,6 +563,7 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
           modelName={model.name}
           categoryName={pageToggle}
           images={dataset?.[pageToggle] || []}
+          imageMetadata={imageMetadata?.[pageToggle]}
           selectedImages={selectedImages}
           onClickImages={onClickImages}
           onDelete={onDelete}
@@ -777,6 +805,7 @@ type DatasetGridProps = {
   modelName: string;
   categoryName: string;
   images: string[];
+  imageMetadata?: { [filename: string]: ClassificationImageMetadata };
   selectedImages: string[];
   onClickImages: (images: string[], ctrl: boolean) => void;
   onDelete: (ids: string[]) => void;
@@ -786,6 +815,7 @@ function DatasetGrid({
   modelName,
   categoryName,
   images,
+  imageMetadata,
   selectedImages,
   onClickImages,
   onDelete,
@@ -802,13 +832,18 @@ function DatasetGrid({
       ref={contentRef}
       className="scrollbar-container grid grid-cols-2 gap-2 overflow-y-scroll p-1 md:grid-cols-4 xl:grid-cols-8 2xl:grid-cols-10 3xl:grid-cols-12"
     >
-      {classData.map((image) => (
+      {classData.map((image) => {
+        const rawMetadata = imageMetadata?.[image];
+        const metadata = metadataFromApi(rawMetadata);
+        return (
         <div key={image} className="aspect-square w-full">
           <ClassificationCard
             data={{
               filename: image,
               filepath: `clips/${modelName}/dataset/${categoryName}/${image}`,
-              name: "",
+              name: metadata?.assignedLabel || categoryName,
+              score: metadata?.confidenceAtAdd,
+              metadata,
             }}
             showArea={false}
             clickable={selectedImages.length > 0}
@@ -832,7 +867,8 @@ function DatasetGrid({
             </Tooltip>
           </ClassificationCard>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -843,6 +879,10 @@ type TrainGridProps = {
   classes: string[];
   trainImages: string[];
   trainFilter?: TrainFilter;
+  suggestionsByFilename: Map<
+    string,
+    TrainSuggestionsResponse["suggestions"][number]
+  >;
   selectedImages: string[];
   onClickImages: (images: string[], ctrl: boolean) => void;
   onRefresh: () => void;
@@ -854,6 +894,7 @@ function TrainGrid({
   classes,
   trainImages,
   trainFilter,
+  suggestionsByFilename,
   selectedImages,
   onClickImages,
   onRefresh,
@@ -865,6 +906,7 @@ function TrainGrid({
         .map((raw) => {
           const parts = raw.replaceAll(".webp", "").split("-");
           const rawScore = Number.parseFloat(parts[4]);
+          const suggestion = suggestionsByFilename.get(raw);
           return {
             filename: raw,
             filepath: `clips/${model.name}/train/${raw}`,
@@ -872,6 +914,9 @@ function TrainGrid({
             eventId: `${parts[0]}-${parts[1]}`,
             name: parts[3],
             score: rawScore,
+            similarity: suggestion
+              ? suggestionToSimilarityInfo(suggestion)
+              : undefined,
           };
         })
         .filter((data) => {
@@ -897,10 +942,14 @@ function TrainGrid({
             return false;
           }
 
+          if (!matchesSimilarityFilter(data.similarity, trainFilter)) {
+            return false;
+          }
+
           return true;
         })
         .sort((a, b) => b.timestamp - a.timestamp),
-    [model, trainImages, trainFilter],
+    [model, trainImages, trainFilter, suggestionsByFilename],
   );
 
   if (model.state_config) {
@@ -950,6 +999,11 @@ function StateTrainGrid({
   onClickImages,
   onRefresh,
 }: StateTrainGridProps) {
+  const { t } = useTranslation(["views/classificationModel"]);
+  const [previewItem, setPreviewItem] = useState<ClassificationItemData | null>(
+    null,
+  );
+
   const threshold = useMemo(() => {
     return {
       recognition: model.threshold,
@@ -957,38 +1011,99 @@ function StateTrainGrid({
     };
   }, [model]);
 
+  const duplicateGroupOutlines = useMemo(
+    () => buildRecentDuplicateGroupOutlineMap(trainData ?? []),
+    [trainData],
+  );
+
   return (
-    <div
-      ref={contentRef}
-      className={cn(
-        "scrollbar-container grid grid-cols-2 gap-3 overflow-y-scroll p-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 3xl:grid-cols-12",
-      )}
-    >
-      {trainData?.map((data) => (
-        <div key={data.filename} className="aspect-square w-full">
-          <ClassificationCard
-            data={data}
-            threshold={threshold}
-            selected={selectedImages.includes(data.filename)}
-            clickable={selectedImages.length > 0}
-            i18nLibrary="views/classificationModel"
-            showArea={false}
-            onClick={(data, meta) => onClickImages([data.filename], meta)}
-          >
-            <ClassificationSelectionDialog
-              classes={classes}
-              modelName={model.name}
-              image={data.filename}
-              onRefresh={onRefresh}
+    <>
+      <div
+        ref={contentRef}
+        className={cn(
+          "scrollbar-container grid grid-cols-2 gap-3 overflow-y-scroll p-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 3xl:grid-cols-12",
+        )}
+      >
+        {trainData?.map((data) => (
+          <div key={data.filename} className="aspect-square w-full">
+            <ClassificationCard
+              data={data}
+              threshold={threshold}
+              selected={selectedImages.includes(data.filename)}
+              clickable={true}
+              i18nLibrary="views/classificationModel"
+              showArea={false}
+              showInteractionHint={selectedImages.length === 0}
+              duplicateGroupOutline={getTileDecorationOutline(
+                data.similarity,
+                duplicateGroupOutlines,
+              )}
+              onClick={(data, meta) => {
+                if (selectedImages.length === 0 && !meta) {
+                  setPreviewItem(data);
+                  return;
+                }
+
+                onClickImages([data.filename], meta);
+              }}
             >
-              <BlurredIconButton>
-                <TbCategoryPlus className="size-5" />
-              </BlurredIconButton>
-            </ClassificationSelectionDialog>
-          </ClassificationCard>
-        </div>
-      ))}
-    </div>
+              <ClassificationSelectionDialog
+                classes={classes}
+                modelName={model.name}
+                image={data.filename}
+                onRefresh={onRefresh}
+              >
+                <BlurredIconButton>
+                  <TbCategoryPlus className="size-5" />
+                </BlurredIconButton>
+              </ClassificationSelectionDialog>
+            </ClassificationCard>
+          </div>
+        ))}
+      </div>
+      <Dialog
+        open={previewItem != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewItem(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          {previewItem && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="capitalize">
+                  {previewItem.name.replaceAll("_", " ")}
+                  {previewItem.score != undefined && (
+                    <span className="ml-2 text-base font-normal text-muted-foreground">
+                      {Math.round(previewItem.score * 100)}%
+                    </span>
+                  )}
+                </DialogTitle>
+                {previewItem.similarity?.suggestedAction && (
+                  <DialogDescription className="whitespace-pre-line pt-2 text-left leading-snug">
+                    {t(
+                      `curation.tooltip.${getCurationTooltipKey(previewItem.similarity, previewItem.similarity.suggestedAction)}`,
+                      buildCurationTooltipValues(
+                        previewItem.similarity,
+                        previewItem.name,
+                        previewItem.score,
+                      ),
+                    )}
+                  </DialogDescription>
+                )}
+              </DialogHeader>
+              <img
+                className="max-h-[70vh] w-full rounded-md object-contain"
+                src={`${baseUrl}${previewItem.filepath}`}
+                alt=""
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

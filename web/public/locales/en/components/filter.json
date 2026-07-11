@@ -43,6 +43,35 @@
     "all": "All Attributes"
   },
   "score": "Score",
+  "similarity": {
+    "label": "Curation",
+    "hint": "Matches the badge on each tile — compares Recent shots to each other and to your training library.",
+    "advanced": "Advanced",
+    "similarToClass": "Closest match is this class",
+    "anyClass": "Any class",
+    "range": "Similarity range (%)",
+    "rangeHint": "Combine with a preset or use alone to narrow by % match.",
+    "presets": {
+      "duplicate_recent": {
+        "desc": "Near-identical to another Recent shot — burst cleanup, keep one."
+      },
+      "duplicate_library": {
+        "desc": "Already represented in your training library — safe to skip."
+      },
+      "add": {
+        "desc": "Confident prediction and not a duplicate — good to add with +."
+      },
+      "mislabel": {
+        "desc": "Looks more like another class than what the model predicted."
+      },
+      "new_scenario": {
+        "desc": "Visually different from your library — adds diversity."
+      },
+      "review": {
+        "desc": "Borderline confidence or similarity — open before adding."
+      }
+    }
+  },
   "estimatedSpeed": "Estimated Speed ({{unit}})",
   "features": {
     "label": "Features",

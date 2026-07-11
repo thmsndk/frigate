@@ -23,15 +23,18 @@
   },
   "toast": {
     "success": {
-      "deletedCategory": "Deleted Class",
-      "deletedImage": "Deleted Images",
       "deletedModel_one": "Successfully deleted {{count}} model",
       "deletedModel_other": "Successfully deleted {{count}} models",
       "categorizedImage": "Successfully Classified Image",
+      "reclassifiedImage": "Successfully Reclassified Image",
       "trainedModel": "Successfully trained model.",
       "trainingModel": "Successfully started model training.",
       "updatedModel": "Successfully updated model configuration",
-      "renamedCategory": "Successfully renamed class to {{name}}"
+      "renamedCategory": "Successfully renamed class to {{name}}",
+      "deletedCategory_one": "Deleted {{count}} class",
+      "deletedCategory_other": "Deleted {{count}} classes",
+      "deletedImage_one": "Deleted {{count}} image",
+      "deletedImage_other": "Deleted {{count}} images"
     },
     "error": {
       "deleteImageFailed": "Failed to delete: {{errorMessage}}",
@@ -41,7 +44,8 @@
       "trainingFailed": "Model training failed. Check Frigate logs for details.",
       "trainingFailedToStart": "Failed to start model training: {{errorMessage}}",
       "updateModelFailed": "Failed to update model: {{errorMessage}}",
-      "renameCategoryFailed": "Failed to rename class: {{errorMessage}}"
+      "renameCategoryFailed": "Failed to rename class: {{errorMessage}}",
+      "reclassifyFailed": "Failed to reclassify image: {{errorMessage}}"
     }
   },
   "deleteCategory": {
@@ -90,6 +94,50 @@
   },
   "categorizeImageAs": "Classify Image As:",
   "categorizeImage": "Classify Image",
+  "reclassifyImageAs": "Reclassify Image As:",
+  "reclassifyImage": "Reclassify Image",
+  "metadata": {
+    "addedConfidence": "Added · was {{score}}%",
+    "relabeled": "Was {{from}} {{fromScore}}% → {{to}}"
+  },
+  "curation": {
+    "interactionHint": "Click to preview · Right-click to select",
+    "interactionHintMobile": "Tap to preview · Long-press to select",
+    "badge": {
+      "duplicate_recent": "Repeat",
+      "duplicate_library": "In library",
+      "add": "Add",
+      "review": "Review",
+      "new_scene": "New scene",
+      "mislabel": "Mislabel?"
+    },
+    "tooltip": {
+      "duplicate_recent": "{{recentSimilarity}}% match to an earlier {{label}} in Recent (Repeat at ≥{{duplicateThreshold}}%).\nModel predicts {{label}} at {{confidence}}%.\nColored border = same burst group. Skip — keep one frame.",
+      "duplicate_library": "{{librarySimilarity}}% match to {{className}} in your training library (In library at ≥{{duplicateThreshold}}%).\nModel predicts {{label}} at {{confidence}}%.\nSkip — you already trained on this.",
+      "add": "Model predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}% confidence).\nCompared to training library: {{librarySimilarity}}%. Compared to earlier Recent {{label}}: {{recentSimilarity}}%. Neither reaches {{duplicateThreshold}}% duplicate threshold.\nUse + to add.",
+      "add_burst": "Keeper frame — first of {{groupSize}} similar {{label}} shots in Recent.\nModel predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}%).\n{{repeatCount}} later shots match it (Repeat).\nCompared to training library: {{librarySimilarity}}%.\nUse + to add this one; skip the Repeat tiles.",
+      "review": "Model predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}%; this is below that).\nCompared to training library: {{librarySimilarity}}%. Compared to earlier Recent {{label}}: {{recentSimilarity}}%.\nClick the thumbnail to inspect, then use + to add or skip.",
+      "review_burst": "First of {{groupSize}} similar {{label}} shots in this Recent burst.\nModel predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}%).\nCompared to library: {{librarySimilarity}}%. This is the keeper frame — skip the Repeat tiles.\nClick the thumbnail to inspect.",
+      "new_scene": "Model predicts {{label}} at {{confidence}}%.\nUnder {{duplicateThreshold}}% match to library ({{librarySimilarity}}%) and Recent — a new-looking scene.\nGood for diversity. Use + to add.",
+      "mislabel": "Model predicts {{predicted}} at {{confidence}}%, but looks {{matchSimilarity}}% like {{relabelClass}} in your training library.\nConsider relabeling before adding."
+    },
+    "similarity": {
+      "matchesLibrary": "{{similarity}}% match · {{className}} library",
+      "closerTo": "Closer to {{className}} ({{similarity}}%)"
+    }
+  },
+  "similarity": {
+    "likeClass": "{{similarity}}% like {{className}}"
+  },
+  "suggestedAction": {
+    "skip_duplicate_recent": "→ Skip (repeat in Recent)",
+    "skip_duplicate_library": "→ Skip (already in library)",
+    "skip_duplicate": "→ Skip (duplicate)",
+    "add_new_scenario": "→ Add (new scenario)",
+    "add": "→ Add",
+    "review": "→ Review",
+    "relabel": "→ Relabel to {{className}}"
+  },
   "menu": {
     "objects": "Objects",
     "states": "States"
@@ -178,9 +226,14 @@
         "classifyFailed": "Failed to classify images: {{error}}"
       },
       "generateSuccess": "Successfully generated sample images",
+      "refreshExamples": "Generate new examples",
+      "refreshConfirm": {
+        "title": "Generate New Examples?",
+        "description": "This will generate a new set of images and clear all selections, including any previous classes. You will need to re-select examples for all classes."
+      },
       "missingStatesWarning": {
-        "title": "Missing State Examples",
-        "description": "It's recommended to select examples for all states for best results. You can continue without selecting all states, but the model will not be trained until all states have images. After continuing, use the Recent Classifications view to classify images for the missing states, then train the model."
+        "title": "Missing Class Examples",
+        "description": "Not all classes have examples. Try generating new examples to find the missing class, or continue and use the Recent Classifications view to add images later."
       }
     }
   }
