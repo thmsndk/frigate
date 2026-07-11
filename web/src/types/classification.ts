@@ -39,6 +39,11 @@ export type ClassificationSimilarityInfo = {
   duplicateGroup?: string;
   duplicateGroupSize?: number;
   trainingPick?: boolean;
+  trainingPickReason?: string;
+  trainingPickIsFirstFrame?: boolean;
+  burstConfidenceMin?: number;
+  burstConfidenceMax?: number;
+  burstConfidenceRunnerUp?: number;
 };
 
 export type ClassificationItemData = {
@@ -89,6 +94,11 @@ export type TrainSuggestion = {
   duplicate_group?: string;
   duplicate_group_size?: number;
   training_pick?: boolean;
+  training_pick_reason?: string;
+  training_pick_is_first_frame?: boolean;
+  burst_confidence_min?: number;
+  burst_confidence_max?: number;
+  burst_confidence_runner_up?: number;
 };
 
 export type ClassificationDatasetResponse = {

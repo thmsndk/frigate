@@ -57,18 +57,21 @@ class TestClassificationSimilarity:
             {
                 "filename": "a.webp",
                 "confidence": 0.87,
+                "timestamp": 1.0,
                 "duplicate_group": "clear-1",
                 "suggested_action": "add",
             },
             {
                 "filename": "b.webp",
                 "confidence": 0.99,
+                "timestamp": 2.0,
                 "duplicate_group": "clear-1",
                 "suggested_action": "skip_duplicate_recent",
             },
             {
                 "filename": "c.webp",
                 "confidence": 0.91,
+                "timestamp": 3.0,
                 "duplicate_group": "clear-1",
                 "suggested_action": "skip_duplicate_recent",
             },
@@ -77,5 +80,7 @@ class TestClassificationSimilarity:
         by_name = {item["filename"]: item for item in suggestions}
         assert by_name["b.webp"]["suggested_action"] == "add"
         assert by_name["b.webp"]["training_pick"] is True
+        assert by_name["b.webp"]["training_pick_reason"] == "highest_confidence_in_burst"
+        assert by_name["b.webp"]["training_pick_is_first_frame"] is False
         assert by_name["a.webp"]["suggested_action"] == "one_per_burst"
         assert by_name["c.webp"]["suggested_action"] == "skip_duplicate_recent"

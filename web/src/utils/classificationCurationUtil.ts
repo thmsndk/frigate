@@ -454,6 +454,18 @@ export function buildCurationTooltipValues(
     relabelClass: matchClass,
     groupSize: similarity?.duplicateGroupSize ?? 1,
     repeatCount: Math.max((similarity?.duplicateGroupSize ?? 1) - 1, 0),
+    lowestConfidence: Math.round((similarity?.burstConfidenceMin ?? 0) * 100),
+    highestConfidence: Math.round((similarity?.burstConfidenceMax ?? 0) * 100),
+    runnerUpConfidence: Math.round(
+      (similarity?.burstConfidenceRunnerUp ?? 0) * 100,
+    ),
+    firstFrameNote: similarity?.trainingPickIsFirstFrame
+      ? " — earliest in the burst, but that is not why it was chosen"
+      : "",
+    pickReasonNote:
+      similarity?.trainingPickReason === "highest_confidence_in_burst"
+        ? "highest model confidence in this burst"
+        : "",
   };
 }
 
@@ -472,6 +484,11 @@ export function suggestionToSimilarityInfo(
     duplicateGroup: suggestion.duplicate_group,
     duplicateGroupSize: suggestion.duplicate_group_size,
     trainingPick: suggestion.training_pick,
+    trainingPickReason: suggestion.training_pick_reason,
+    trainingPickIsFirstFrame: suggestion.training_pick_is_first_frame,
+    burstConfidenceMin: suggestion.burst_confidence_min,
+    burstConfidenceMax: suggestion.burst_confidence_max,
+    burstConfidenceRunnerUp: suggestion.burst_confidence_runner_up,
   };
 }
 

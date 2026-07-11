@@ -433,6 +433,7 @@ def compute_train_suggestions(model_name: str) -> list[dict[str, Any]]:
                 "filename": file,
                 "predicted_label": predicted_label,
                 "confidence": confidence,
+                "timestamp": timestamp,
                 "max_similarity": round(max_overall, 4),
                 "max_same_class_similarity": round(max_same, 4),
                 "max_same_class_dataset_similarity": round(max_same_dataset, 4),
@@ -475,10 +476,30 @@ def _apply_burst_training_picks(suggestions: list[dict[str, Any]]) -> None:
 
         # v1: highest confidence in burst. Future: hard-positive / user preference.
         training_pick = max(members, key=lambda item: item["confidence"])
+        confidences = [member["confidence"] for member in members]
+        min_confidence = min(confidences)
+        max_confidence = max(confidences)
+        sorted_by_time = sorted(members, key=lambda item: item["timestamp"])
+        is_first_frame = training_pick["filename"] == sorted_by_time[0]["filename"]
+        runner_up_confidence = max(
+            (
+                member["confidence"]
+                for member in members
+                if member is not training_pick
+            ),
+            default=min_confidence,
+        )
 
         for suggestion in members:
             if suggestion is training_pick:
                 suggestion["training_pick"] = True
+                suggestion["training_pick_reason"] = "highest_confidence_in_burst"
+                suggestion["training_pick_is_first_frame"] = is_first_frame
+                suggestion["burst_confidence_min"] = round(min_confidence, 4)
+                suggestion["burst_confidence_max"] = round(max_confidence, 4)
+                suggestion["burst_confidence_runner_up"] = round(
+                    runner_up_confidence, 4
+                )
                 if suggestion["confidence"] >= HIGH_CONFIDENCE_THRESHOLD:
                     suggestion["suggested_action"] = "add"
                 else:
