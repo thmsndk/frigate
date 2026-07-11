@@ -53,22 +53,22 @@
     "rangeHint": "Combine with a preset or use alone to narrow by % match.",
     "presets": {
       "duplicate_recent": {
-        "desc": "Near-identical to another Recent shot — burst cleanup, keep one."
+        "desc": "Visually near-identical to another Recent shot — usually skip after picking one from the burst."
       },
       "duplicate_library": {
-        "desc": "Already represented in your training library — safe to skip."
+        "desc": "Visually similar to training library — usually skip; you can still add if you disagree."
       },
-      "add": {
-        "desc": "Confident prediction and not a duplicate — good to add with +."
+      "training_pick": {
+        "desc": "Burst candidates flagged by signal: Lower conf (uncertain among repeats) and/or Most different (least like other burst frames)."
+      },
+      "candidate": {
+        "desc": "Not a duplicate — worth reviewing; model confidence shown for context only."
       },
       "mislabel": {
-        "desc": "Looks more like another class than what the model predicted."
+        "desc": "Looks more like another class than predicted — verify before adding."
       },
       "new_scenario": {
-        "desc": "Visually different from your library — adds diversity."
-      },
-      "review": {
-        "desc": "Borderline confidence or similarity — open before adding."
+        "desc": "Visually different from library — often good for diversity if label is correct."
       }
     }
   },

@@ -106,22 +106,23 @@
     "badge": {
       "duplicate_recent": "Repeat",
       "duplicate_library": "In library",
-      "one_per_burst": "One per burst",
-      "add": "Add",
-      "review": "Review",
+      "training_pick": "Training pick",
+      "hard_positive_in_burst": "Lower conf",
+      "most_diverse_in_burst": "Most different",
+      "candidate": "Candidate",
       "new_scene": "New scene",
       "mislabel": "Mislabel?"
     },
     "tooltip": {
-      "duplicate_recent": "{{recentSimilarity}}% match to an earlier {{label}} in Recent (Repeat at ≥{{duplicateThreshold}}%).\nModel predicts {{label}} at {{confidence}}%.\nSkip — another frame in this burst is enough.",
-      "one_per_burst": "This burst needs only one training example — another tile is marked Add.\nModel predicts {{label}} at {{confidence}}% (this burst ranges {{lowestConfidence}}–{{highestConfidence}}%).\nWe suggested the highest-confidence frame, not the first by time. Skip this one.",
-      "duplicate_library": "{{librarySimilarity}}% match to {{className}} in your training library (In library at ≥{{duplicateThreshold}}%).\nModel predicts {{label}} at {{confidence}}%.\nSkip — you already trained on this.",
-      "add": "Model predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}% confidence).\nCompared to training library: {{librarySimilarity}}%. Compared to earlier Recent {{label}}: {{recentSimilarity}}%. Neither reaches {{duplicateThreshold}}% duplicate threshold.\nUse + to add.",
-      "add_burst": "Why this tile? Of {{groupSize}} nearly identical {{label}} frames, we suggest this one because it has the {{pickReasonNote}} ({{confidence}}%; others in the burst: {{lowestConfidence}}–{{runnerUpConfidence}}%){{firstFrameNote}}.\nTraining tip: when frames look the same, add one clear example — not the whole burst. Skip Repeats and One per burst tiles.",
-      "review": "Model predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}%; this is below that).\nCompared to training library: {{librarySimilarity}}%. Compared to earlier Recent {{label}}: {{recentSimilarity}}%.\nClick the thumbnail to inspect, then use + to add or skip.",
-      "review_training_pick": "Why this tile? Of {{groupSize}} nearly identical {{label}} frames, this has the {{pickReasonNote}} ({{confidence}}%) — but still below the Add threshold (≥{{confidenceThreshold}}%){{firstFrameNote}}.\nOthers in the burst: {{lowestConfidence}}–{{runnerUpConfidence}}%. Add only if you agree after inspecting; skip the rest.",
-      "new_scene": "Model predicts {{label}} at {{confidence}}%.\nUnder {{duplicateThreshold}}% match to library ({{librarySimilarity}}%) and Recent — a new-looking scene.\nGood for diversity. Use + to add.",
-      "mislabel": "Model predicts {{predicted}} at {{confidence}}%, but looks {{matchSimilarity}}% like {{relabelClass}} in your training library.\nConsider relabeling before adding."
+      "duplicate_recent": "Repeat — {{groupSize}}-frame burst. {{recentSimilarity}}% visual match to an earlier {{label}} in Recent (≥{{duplicateThreshold}}% = duplicate).\n\nThis frame: {{label}} at {{confidence}}%. Burst confidence {{lowestConfidence}}–{{highestConfidence}}%.",
+      "duplicate_library": "In library — {{librarySimilarity}}% visual match to {{className}} in your training library (≥{{duplicateThreshold}}%).\n\nModel predicts {{label}} at {{confidence}}%.",
+      "hard_positive_in_burst": "Lower conf — ranked {{confidenceRank}} of {{groupSize}} in this burst (1 = lowest confidence).\n\nThis frame: {{confidence}}%. Burst range: {{lowestConfidence}}–{{highestConfidence}}% (spread {{confidenceSpread}} pts). Flagged as 1 of {{hardPositivePoolSize}} bottom frames (~25% of burst when spread ≥1%).\n\nThe model is less sure on this frame than on most repeats here.",
+      "most_diverse_in_burst": "Most different — ranked {{diversityRank}} of {{groupSize}} (1 = least like the other burst frames).\n\nAvg {{avgBurstSimilarity}}% visual match to the other {{groupSize}} frames. Flagged as 1 of {{diversityPoolSize}} most-unique frames (~25%).\n\nBursts are not always pixel-identical — this frame varies most from the group.",
+      "training_pick_both_signals": "Lower conf + Most different — see each badge tooltip for this frame's ranks and numbers.",
+      "training_pick": "Burst candidate — hover each badge for why this frame was flagged.",
+      "candidate": "Candidate — not flagged as a duplicate; worth reviewing for your training set.\nModel predicts {{label}} at {{confidence}}% (informational — not proof the label is correct).\nLibrary match: {{librarySimilarity}}%. Recent {{label}} match: {{recentSimilarity}}%.\nYou verify: + if correct, relabel if not, or skip.",
+      "new_scene": "New scene — under {{duplicateThreshold}}% visual match to library ({{librarySimilarity}}%) and Recent; looks different from what you have.\nModel predicts {{label}} at {{confidence}}% (informational).\nOften good for diversity if you verify the label. You decide: +, relabel, or skip.",
+      "mislabel": "Mislabel? — model predicts {{predicted}} at {{confidence}}%, but looks {{matchSimilarity}}% like {{relabelClass}} in your training library.\nSimilarity hint only — you decide whether to relabel, add as-is, or skip."
     },
     "similarity": {
       "matchesLibrary": "{{similarity}}% match · {{className}} library",
@@ -135,9 +136,9 @@
     "skip_duplicate_recent": "→ Skip (repeat in Recent)",
     "skip_duplicate_library": "→ Skip (already in library)",
     "skip_duplicate": "→ Skip (duplicate)",
-    "add_new_scenario": "→ Add (new scenario)",
-    "add": "→ Add",
-    "review": "→ Review",
+    "add_new_scenario": "→ Candidate (new scene)",
+    "candidate": "→ Candidate",
+    "training_pick": "→ Training pick",
     "relabel": "→ Relabel to {{className}}"
   },
   "menu": {

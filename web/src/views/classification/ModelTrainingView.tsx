@@ -1084,7 +1084,7 @@ function StateTrainGrid({
                 {previewItem.similarity?.suggestedAction && (
                   <DialogDescription className="whitespace-pre-line pt-2 text-left leading-snug">
                     {t(
-                      `curation.tooltip.${getCurationTooltipKey(previewItem.similarity, previewItem.similarity.suggestedAction)}`,
+                      `curation.tooltip.${getCurationTooltipKey(previewItem.similarity.suggestedAction, previewItem.similarity.trainingPick, previewItem.similarity.trainingPickReasons)}`,
                       buildCurationTooltipValues(
                         previewItem.similarity,
                         previewItem.name,

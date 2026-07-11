@@ -10,22 +10,64 @@ import {
 } from "@/types/classification";
 import {
   LuArrowLeftRight,
-  LuEye,
   LuLayers,
-  LuPlus,
   LuSparkles,
+  LuTrendingDown,
+  LuScanEye,
 } from "react-icons/lu";
 import { HiSquare2Stack } from "react-icons/hi2";
 import { IconType } from "react-icons/lib";
 
+export type TrainingPickSignalKind =
+  | "hard_positive_in_burst"
+  | "most_diverse_in_burst";
+
 export type CurationBadgeKind =
   | "duplicate_recent"
   | "duplicate_library"
-  | "one_per_burst"
-  | "add"
-  | "review"
+  | TrainingPickSignalKind
+  | "training_pick"
+  | "candidate"
   | "new_scene"
   | "mislabel";
+
+export type CurationBadgeStackItem = {
+  kind: CurationBadgeKind;
+  relabelTarget?: string;
+  className: string;
+  Icon: IconType;
+};
+
+const TRAINING_PICK_SIGNAL_CLASS =
+  "border-amber-200 bg-amber-400 text-black shadow-[0_0_0_1px_rgba(0,0,0,0.35)]";
+
+export function getTrainingPickSignalBadges(
+  reasons?: string[],
+): CurationBadgeStackItem[] {
+  if (!reasons?.length) {
+    return [];
+  }
+
+  const badges: CurationBadgeStackItem[] = [];
+
+  if (reasons.includes("hard_positive_in_burst")) {
+    badges.push({
+      kind: "hard_positive_in_burst",
+      className: TRAINING_PICK_SIGNAL_CLASS,
+      Icon: LuTrendingDown,
+    });
+  }
+
+  if (reasons.includes("most_diverse_in_burst")) {
+    badges.push({
+      kind: "most_diverse_in_burst",
+      className: "border-violet-200 bg-violet-300 text-black shadow-[0_0_0_1px_rgba(0,0,0,0.35)]",
+      Icon: LuScanEye,
+    });
+  }
+
+  return badges;
+}
 
 export type CurationBadgePresentation = {
   kind: CurationBadgeKind;
@@ -44,8 +86,8 @@ export function getCurationBadgeKind(
   if (suggestedAction === "skip_duplicate_recent") {
     return "duplicate_recent";
   }
-  if (suggestedAction === "one_per_burst") {
-    return "one_per_burst";
+  if (suggestedAction === "training_pick") {
+    return "training_pick";
   }
   if (
     suggestedAction === "skip_duplicate_library" ||
@@ -56,11 +98,12 @@ export function getCurationBadgeKind(
   if (suggestedAction === "add_new_scenario") {
     return "new_scene";
   }
-  if (suggestedAction === "add") {
-    return "add";
-  }
-  if (suggestedAction === "review") {
-    return "review";
+  if (
+    suggestedAction === "candidate" ||
+    suggestedAction === "add" ||
+    suggestedAction === "review"
+  ) {
+    return "candidate";
   }
   if (suggestedAction.startsWith("relabel_to_")) {
     return "mislabel";
@@ -98,23 +141,29 @@ export function getCurationBadgePresentation(
         className: "border-white/20 bg-black/70 text-gray-200",
         Icon: LuLayers,
       };
-    case "one_per_burst":
+    case "training_pick":
       return {
         kind,
-        className: "border-slate-400/40 bg-slate-800/90 text-slate-200",
-        Icon: HiSquare2Stack,
+        className: TRAINING_PICK_SIGNAL_CLASS,
+        Icon: LuTrendingDown,
       };
-    case "add":
+    case "hard_positive_in_burst":
       return {
         kind,
-        className: "border-success/30 bg-success/90 text-white",
-        Icon: LuPlus,
+        className: TRAINING_PICK_SIGNAL_CLASS,
+        Icon: LuTrendingDown,
       };
-    case "review":
+    case "most_diverse_in_burst":
       return {
         kind,
-        className: "border-orange-400/40 bg-orange-500/90 text-white",
-        Icon: LuEye,
+        className: "border-violet-200 bg-violet-300 text-black shadow-[0_0_0_1px_rgba(0,0,0,0.35)]",
+        Icon: LuScanEye,
+      };
+    case "candidate":
+      return {
+        kind,
+        className: "border-sky-400/40 bg-sky-700/90 text-white",
+        Icon: LuSparkles,
       };
     case "new_scene":
       return {
@@ -132,7 +181,6 @@ export function getCurationBadgePresentation(
   }
 }
 
-export const CURATION_CONFIDENCE_THRESHOLD = 85;
 export const CURATION_DUPLICATE_THRESHOLD = 90;
 
 export const RECENT_DUPLICATE_GROUP_OUTLINES = [
@@ -221,13 +269,12 @@ export function shouldShowSimilaritySubtitle(
     !kind ||
     kind === "duplicate_recent" ||
     kind === "duplicate_library" ||
-    kind === "one_per_burst" ||
     kind === "new_scene"
   ) {
     return false;
   }
 
-  if (kind === "add") {
+  if (kind === "candidate") {
     return (similarity.maxSameClassSimilarity ?? 0) < 0.7;
   }
 
@@ -235,7 +282,7 @@ export function shouldShowSimilaritySubtitle(
     return true;
   }
 
-  if (kind === "review") {
+  if (kind === "training_pick") {
     const other = similarity.maxOtherClassSimilarity ?? 0;
     const same = similarity.maxSameClassSimilarity ?? 0;
     return (
@@ -251,10 +298,10 @@ export function shouldShowSimilaritySubtitle(
 export function getSimilaritySubtitleKey(
   kind: CurationBadgeKind | undefined,
 ): "closerTo" | "matchesLibrary" | undefined {
-  if (kind === "mislabel" || kind === "review") {
+  if (kind === "mislabel" || kind === "training_pick") {
     return "closerTo";
   }
-  if (kind === "add") {
+  if (kind === "candidate") {
     return "matchesLibrary";
   }
   return undefined;
@@ -264,9 +311,9 @@ export function getSimilaritySubtitleKey(
 export const CURATION_FILTER_PRESETS: SimilarityPreset[] = [
   "duplicate_recent",
   "duplicate_library",
+  "training_pick",
+  "candidate",
   "mislabel",
-  "add",
-  "review",
   "new_scenario",
 ];
 
@@ -276,10 +323,10 @@ export function suggestedActionForPreset(preset: SimilarityPreset): string {
       return "skip_duplicate_recent";
     case "duplicate_library":
       return "skip_duplicate_library";
-    case "add":
-      return "add";
-    case "review":
-      return "review";
+    case "training_pick":
+      return "training_pick";
+    case "candidate":
+      return "candidate";
     case "new_scenario":
       return "add_new_scenario";
     case "mislabel":
@@ -330,8 +377,17 @@ export function matchesSimilarityFilter(
           return false;
         }
         break;
-      case "add":
-        if (suggestion.suggestedAction !== "add") {
+      case "training_pick":
+        if (!suggestion.trainingPick) {
+          return false;
+        }
+        break;
+      case "candidate":
+        if (
+          suggestion.suggestedAction !== "candidate" &&
+          suggestion.suggestedAction !== "add" &&
+          suggestion.suggestedAction !== "review"
+        ) {
           return false;
         }
         break;
@@ -342,11 +398,6 @@ export function matchesSimilarityFilter(
         break;
       case "new_scenario":
         if (suggestion.suggestedAction !== "add_new_scenario") {
-          return false;
-        }
-        break;
-      case "review":
-        if (suggestion.suggestedAction !== "review") {
           return false;
         }
         break;
@@ -371,29 +422,55 @@ export function matchesSimilarityFilter(
 }
 
 export function getCurationTooltipKey(
-  similarity: ClassificationSimilarityInfo | undefined,
   suggestedAction?: string,
+  trainingPick?: boolean,
+  trainingPickReasons?: string[],
 ): string | undefined {
+  if (trainingPick && trainingPickReasons?.length) {
+    const hasHard = trainingPickReasons.includes("hard_positive_in_burst");
+    const hasDiverse = trainingPickReasons.includes("most_diverse_in_burst");
+    if (hasHard && hasDiverse) {
+      return "training_pick_both_signals";
+    }
+    if (hasHard) {
+      return "hard_positive_in_burst";
+    }
+    if (hasDiverse) {
+      return "most_diverse_in_burst";
+    }
+  }
+
   const presentation = getCurationBadgePresentation(suggestedAction);
   if (!presentation) {
     return undefined;
   }
 
-  if (
-    presentation.kind === "review" &&
-    similarity?.trainingPick
-  ) {
-    return "review_training_pick";
-  }
-
-  if (
-    presentation.kind === "add" &&
-    (similarity?.duplicateGroupSize ?? 1) > 1
-  ) {
-    return "add_burst";
-  }
-
   return presentation.kind;
+}
+
+export function buildCurationBadgeStack(
+  similarity?: ClassificationSimilarityInfo,
+): CurationBadgeStackItem[] {
+  const items: CurationBadgeStackItem[] = [];
+
+  if (similarity?.trainingPick) {
+    const signalBadges = getTrainingPickSignalBadges(similarity.trainingPickReasons);
+    if (signalBadges.length > 0) {
+      items.push(...signalBadges);
+    } else {
+      const fallback = getCurationBadgePresentation("training_pick");
+      if (fallback) {
+        items.push(fallback);
+      }
+    }
+  }
+
+  const basePresentation = getCurationBadgePresentation(similarity?.suggestedAction);
+  if (basePresentation) {
+    items.push(basePresentation);
+  }
+
+  return items;
 }
 
 export function formatClassLabel(label?: string): string {
@@ -444,7 +521,6 @@ export function buildCurationTooltipValues(
     className: matchClass,
     predicted: label,
     confidence: confidencePct,
-    confidenceThreshold: CURATION_CONFIDENCE_THRESHOLD,
     duplicateThreshold: CURATION_DUPLICATE_THRESHOLD,
     similarity: maxSim,
     recentSimilarity: recentSim,
@@ -456,16 +532,14 @@ export function buildCurationTooltipValues(
     repeatCount: Math.max((similarity?.duplicateGroupSize ?? 1) - 1, 0),
     lowestConfidence: Math.round((similarity?.burstConfidenceMin ?? 0) * 100),
     highestConfidence: Math.round((similarity?.burstConfidenceMax ?? 0) * 100),
-    runnerUpConfidence: Math.round(
-      (similarity?.burstConfidenceRunnerUp ?? 0) * 100,
+    confidenceSpread: Math.round((similarity?.burstConfidenceSpread ?? 0) * 100),
+    confidenceRank: similarity?.burstConfidenceRank ?? "—",
+    diversityRank: similarity?.burstDiversityRank ?? "—",
+    avgBurstSimilarity: Math.round(
+      (similarity?.burstAvgIntraSimilarity ?? 0) * 100,
     ),
-    firstFrameNote: similarity?.trainingPickIsFirstFrame
-      ? " — earliest in the burst, but that is not why it was chosen"
-      : "",
-    pickReasonNote:
-      similarity?.trainingPickReason === "highest_confidence_in_burst"
-        ? "highest model confidence in this burst"
-        : "",
+    hardPositivePoolSize: similarity?.burstHardPositivePoolSize ?? 0,
+    diversityPoolSize: similarity?.burstDiversityPoolSize ?? 0,
   };
 }
 
@@ -485,10 +559,19 @@ export function suggestionToSimilarityInfo(
     duplicateGroupSize: suggestion.duplicate_group_size,
     trainingPick: suggestion.training_pick,
     trainingPickReason: suggestion.training_pick_reason,
-    trainingPickIsFirstFrame: suggestion.training_pick_is_first_frame,
+    trainingPickReasons:
+      suggestion.training_pick_reasons ??
+      (suggestion.training_pick_reason
+        ? suggestion.training_pick_reason.split(",").filter(Boolean)
+        : undefined),
     burstConfidenceMin: suggestion.burst_confidence_min,
     burstConfidenceMax: suggestion.burst_confidence_max,
-    burstConfidenceRunnerUp: suggestion.burst_confidence_runner_up,
+    burstConfidenceSpread: suggestion.burst_confidence_spread,
+    burstConfidenceRank: suggestion.burst_confidence_rank,
+    burstDiversityRank: suggestion.burst_diversity_rank,
+    burstAvgIntraSimilarity: suggestion.burst_avg_intra_similarity,
+    burstHardPositivePoolSize: suggestion.burst_hard_positive_pool_size,
+    burstDiversityPoolSize: suggestion.burst_diversity_pool_size,
   };
 }
 

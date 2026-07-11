@@ -20,7 +20,6 @@ DHASH_BITS = 64
 DUPLICATE_THRESHOLD = 0.90
 MISLABEL_THRESHOLD = 0.85
 NEW_SCENARIO_THRESHOLD = 0.70
-HIGH_CONFIDENCE_THRESHOLD = 0.85
 
 
 def meta_path_for_image(image_path: str) -> str:
@@ -271,9 +270,7 @@ def compute_suggested_action(
         < NEW_SCENARIO_THRESHOLD
     ):
         return "add_new_scenario"
-    if confidence >= HIGH_CONFIDENCE_THRESHOLD:
-        return "add"
-    return "review"
+    return "candidate"
 
 
 def _best_match_for_hash(
@@ -434,6 +431,7 @@ def compute_train_suggestions(model_name: str) -> list[dict[str, Any]]:
                 "predicted_label": predicted_label,
                 "confidence": confidence,
                 "timestamp": timestamp,
+                "image_hash": image_hash,
                 "max_similarity": round(max_overall, 4),
                 "max_same_class_similarity": round(max_same, 4),
                 "max_same_class_dataset_similarity": round(max_same_dataset, 4),
@@ -465,50 +463,118 @@ def compute_train_suggestions(model_name: str) -> list[dict[str, Any]]:
 
 
 def _apply_burst_training_picks(suggestions: list[dict[str, Any]]) -> None:
-    """Pick one suggested training frame per Recent burst — not always the first."""
+    """Mark potential training candidates within each Recent burst.
+
+    All burst members stay Repeat (skip_duplicate_recent). Training pick is an
+    additional flag on frames worth a closer look — not a single mandated add.
+    """
     by_group: dict[str, list[dict[str, Any]]] = {}
     for suggestion in suggestions:
         by_group.setdefault(suggestion["duplicate_group"], []).append(suggestion)
+
+    hard_positive_fraction = 0.25
+    diversity_fraction = 0.25
+    min_confidence_spread = 0.01
 
     for members in by_group.values():
         if len(members) <= 1:
             continue
 
-        # v1: highest confidence in burst. Future: hard-positive / user preference.
-        training_pick = max(members, key=lambda item: item["confidence"])
         confidences = [member["confidence"] for member in members]
         min_confidence = min(confidences)
         max_confidence = max(confidences)
-        sorted_by_time = sorted(members, key=lambda item: item["timestamp"])
-        is_first_frame = training_pick["filename"] == sorted_by_time[0]["filename"]
-        runner_up_confidence = max(
-            (
-                member["confidence"]
-                for member in members
-                if member is not training_pick
-            ),
-            default=min_confidence,
-        )
+        confidence_spread = max_confidence - min_confidence
+
+        sorted_by_confidence = sorted(members, key=lambda item: item["confidence"])
+        confidence_rank_by_filename = {
+            member["filename"]: rank + 1
+            for rank, member in enumerate(sorted_by_confidence)
+        }
+
+        hard_positive_filenames: set[str] = set()
+        hard_positive_pool_size = 0
+        if confidence_spread >= min_confidence_spread:
+            hard_positive_pool_size = max(
+                1, int(len(sorted_by_confidence) * hard_positive_fraction)
+            )
+            for member in sorted_by_confidence[:hard_positive_pool_size]:
+                hard_positive_filenames.add(member["filename"])
+
+        members_with_hash = [member for member in members if member.get("image_hash")]
+
+        def average_intra_burst_similarity(member: dict[str, Any]) -> float:
+            member_hash = member.get("image_hash")
+            if not member_hash:
+                return 1.0
+            other_hashes = [
+                other["image_hash"]
+                for other in members_with_hash
+                if other["filename"] != member["filename"] and other.get("image_hash")
+            ]
+            if not other_hashes:
+                return 1.0
+            return sum(
+                hash_similarity(member_hash, other_hash) for other_hash in other_hashes
+            ) / len(other_hashes)
+
+        avg_similarity_by_filename = {
+            member["filename"]: average_intra_burst_similarity(member)
+            for member in members_with_hash
+        }
+
+        diversity_filenames: set[str] = set()
+        diversity_pool_size = 0
+        diversity_rank_by_filename: dict[str, int] = {}
+        if len(members_with_hash) >= 2:
+            sorted_by_diversity = sorted(
+                members_with_hash,
+                key=lambda item: avg_similarity_by_filename[item["filename"]],
+            )
+            diversity_rank_by_filename = {
+                member["filename"]: rank + 1
+                for rank, member in enumerate(sorted_by_diversity)
+            }
+            diversity_pool_size = max(1, int(len(sorted_by_diversity) * diversity_fraction))
+            for member in sorted_by_diversity[:diversity_pool_size]:
+                diversity_filenames.add(member["filename"])
+
+        pick_filenames = hard_positive_filenames | diversity_filenames
 
         for suggestion in members:
-            if suggestion is training_pick:
-                suggestion["training_pick"] = True
-                suggestion["training_pick_reason"] = "highest_confidence_in_burst"
-                suggestion["training_pick_is_first_frame"] = is_first_frame
-                suggestion["burst_confidence_min"] = round(min_confidence, 4)
-                suggestion["burst_confidence_max"] = round(max_confidence, 4)
-                suggestion["burst_confidence_runner_up"] = round(
-                    runner_up_confidence, 4
+            filename = suggestion["filename"]
+            suggestion["training_pick"] = False
+            suggestion["training_pick_reasons"] = []
+            suggestion["burst_confidence_min"] = round(min_confidence, 4)
+            suggestion["burst_confidence_max"] = round(max_confidence, 4)
+            suggestion["burst_confidence_spread"] = round(confidence_spread, 4)
+            suggestion["burst_confidence_rank"] = confidence_rank_by_filename.get(
+                filename
+            )
+            suggestion["burst_diversity_rank"] = diversity_rank_by_filename.get(
+                filename
+            )
+            if filename in avg_similarity_by_filename:
+                suggestion["burst_avg_intra_similarity"] = round(
+                    avg_similarity_by_filename[filename], 4
                 )
-                if suggestion["confidence"] >= HIGH_CONFIDENCE_THRESHOLD:
-                    suggestion["suggested_action"] = "add"
-                else:
-                    suggestion["suggested_action"] = "review"
-            elif suggestion["suggested_action"] == "skip_duplicate_recent":
-                suggestion["training_pick"] = False
-            else:
-                suggestion["suggested_action"] = "one_per_burst"
-                suggestion["training_pick"] = False
+            suggestion["burst_hard_positive_pool_size"] = hard_positive_pool_size
+            suggestion["burst_diversity_pool_size"] = diversity_pool_size
+
+            if suggestion["suggested_action"] != "skip_duplicate_library":
+                suggestion["suggested_action"] = "skip_duplicate_recent"
+
+            if filename not in pick_filenames:
+                continue
+
+            reasons: list[str] = []
+            if filename in hard_positive_filenames:
+                reasons.append("hard_positive_in_burst")
+            if filename in diversity_filenames:
+                reasons.append("most_diverse_in_burst")
+
+            suggestion["training_pick"] = True
+            suggestion["training_pick_reasons"] = reasons
+            suggestion["training_pick_reason"] = ",".join(reasons)
 
 
 def build_categorize_metadata(

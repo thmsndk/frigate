@@ -44,28 +44,30 @@ class TestClassificationSimilarity:
         action = compute_suggested_action(0.67, 0.2, 0.2, 0.3, "clear")
         assert action == "add_new_scenario"
 
-    def test_compute_suggested_action_add(self):
+    def test_compute_suggested_action_candidate_high_confidence(self):
         action = compute_suggested_action(0.92, 0.75, 0.2, 0.4, "clear")
-        assert action == "add"
+        assert action == "candidate"
 
-    def test_compute_suggested_action_review(self):
+    def test_compute_suggested_action_candidate_low_confidence(self):
         action = compute_suggested_action(0.72, 0.75, 0.2, 0.4, "clear")
-        assert action == "review"
+        assert action == "candidate"
 
-    def test_burst_training_pick_prefers_highest_confidence(self):
+    def test_burst_marks_multiple_training_picks_as_repeat(self):
         suggestions = [
             {
                 "filename": "a.webp",
                 "confidence": 0.87,
                 "timestamp": 1.0,
                 "duplicate_group": "clear-1",
-                "suggested_action": "add",
+                "image_hash": "0" * 16,
+                "suggested_action": "candidate",
             },
             {
                 "filename": "b.webp",
                 "confidence": 0.99,
                 "timestamp": 2.0,
                 "duplicate_group": "clear-1",
+                "image_hash": "f" * 16,
                 "suggested_action": "skip_duplicate_recent",
             },
             {
@@ -73,14 +75,48 @@ class TestClassificationSimilarity:
                 "confidence": 0.91,
                 "timestamp": 3.0,
                 "duplicate_group": "clear-1",
+                "image_hash": "a" * 16,
                 "suggested_action": "skip_duplicate_recent",
             },
         ]
         _apply_burst_training_picks(suggestions)
         by_name = {item["filename"]: item for item in suggestions}
-        assert by_name["b.webp"]["suggested_action"] == "add"
-        assert by_name["b.webp"]["training_pick"] is True
-        assert by_name["b.webp"]["training_pick_reason"] == "highest_confidence_in_burst"
-        assert by_name["b.webp"]["training_pick_is_first_frame"] is False
-        assert by_name["a.webp"]["suggested_action"] == "one_per_burst"
+
+        assert by_name["a.webp"]["suggested_action"] == "skip_duplicate_recent"
+        assert by_name["a.webp"]["training_pick"] is True
+        assert "hard_positive_in_burst" in by_name["a.webp"]["training_pick_reasons"]
+
+        assert by_name["b.webp"]["suggested_action"] == "skip_duplicate_recent"
+        assert by_name["b.webp"]["training_pick"] is False
+
         assert by_name["c.webp"]["suggested_action"] == "skip_duplicate_recent"
+        assert by_name["c.webp"]["training_pick"] is False
+
+    def test_burst_diversity_pick_can_overlap_hard_positive(self):
+        suggestions = [
+            {
+                "filename": "low.webp",
+                "confidence": 0.70,
+                "timestamp": 1.0,
+                "duplicate_group": "clear-1",
+                "image_hash": "0" * 16,
+                "suggested_action": "candidate",
+            },
+            {
+                "filename": "high.webp",
+                "confidence": 0.95,
+                "timestamp": 2.0,
+                "duplicate_group": "clear-1",
+                "image_hash": "f" * 16,
+                "suggested_action": "skip_duplicate_recent",
+            },
+        ]
+        _apply_burst_training_picks(suggestions)
+        by_name = {item["filename"]: item for item in suggestions}
+
+        assert by_name["low.webp"]["training_pick"] is True
+        assert by_name["low.webp"]["burst_confidence_rank"] == 1
+        assert "hard_positive_in_burst" in by_name["low.webp"]["training_pick_reasons"]
+        assert by_name["high.webp"]["training_pick"] is True
+        assert by_name["high.webp"]["burst_diversity_rank"] == 1
+        assert "most_diverse_in_burst" in by_name["high.webp"]["training_pick_reasons"]

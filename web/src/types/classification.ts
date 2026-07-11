@@ -4,10 +4,10 @@ export type TrainFilters = (typeof TRAIN_FILTERS)[number];
 export type SimilarityPreset =
   | "duplicate_recent"
   | "duplicate_library"
-  | "add"
+  | "training_pick"
+  | "candidate"
   | "mislabel"
-  | "new_scenario"
-  | "review";
+  | "new_scenario";
 
 export type TrainFilter = {
   classes?: string[];
@@ -40,10 +40,15 @@ export type ClassificationSimilarityInfo = {
   duplicateGroupSize?: number;
   trainingPick?: boolean;
   trainingPickReason?: string;
-  trainingPickIsFirstFrame?: boolean;
+  trainingPickReasons?: string[];
   burstConfidenceMin?: number;
   burstConfidenceMax?: number;
-  burstConfidenceRunnerUp?: number;
+  burstConfidenceSpread?: number;
+  burstConfidenceRank?: number;
+  burstDiversityRank?: number;
+  burstAvgIntraSimilarity?: number;
+  burstHardPositivePoolSize?: number;
+  burstDiversityPoolSize?: number;
 };
 
 export type ClassificationItemData = {
@@ -95,10 +100,15 @@ export type TrainSuggestion = {
   duplicate_group_size?: number;
   training_pick?: boolean;
   training_pick_reason?: string;
-  training_pick_is_first_frame?: boolean;
+  training_pick_reasons?: string[];
   burst_confidence_min?: number;
   burst_confidence_max?: number;
-  burst_confidence_runner_up?: number;
+  burst_confidence_spread?: number;
+  burst_confidence_rank?: number;
+  burst_diversity_rank?: number;
+  burst_avg_intra_similarity?: number;
+  burst_hard_positive_pool_size?: number;
+  burst_diversity_pool_size?: number;
 };
 
 export type ClassificationDatasetResponse = {
