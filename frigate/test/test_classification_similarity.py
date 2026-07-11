@@ -1,4 +1,5 @@
 from frigate.util.classification_similarity import (
+    _apply_burst_training_picks,
     compute_suggested_action,
     hash_similarity,
     parse_train_filename,
@@ -50,3 +51,31 @@ class TestClassificationSimilarity:
     def test_compute_suggested_action_review(self):
         action = compute_suggested_action(0.72, 0.75, 0.2, 0.4, "clear")
         assert action == "review"
+
+    def test_burst_training_pick_prefers_highest_confidence(self):
+        suggestions = [
+            {
+                "filename": "a.webp",
+                "confidence": 0.87,
+                "duplicate_group": "clear-1",
+                "suggested_action": "add",
+            },
+            {
+                "filename": "b.webp",
+                "confidence": 0.99,
+                "duplicate_group": "clear-1",
+                "suggested_action": "skip_duplicate_recent",
+            },
+            {
+                "filename": "c.webp",
+                "confidence": 0.91,
+                "duplicate_group": "clear-1",
+                "suggested_action": "skip_duplicate_recent",
+            },
+        ]
+        _apply_burst_training_picks(suggestions)
+        by_name = {item["filename"]: item for item in suggestions}
+        assert by_name["b.webp"]["suggested_action"] == "add"
+        assert by_name["b.webp"]["training_pick"] is True
+        assert by_name["a.webp"]["suggested_action"] == "one_per_burst"
+        assert by_name["c.webp"]["suggested_action"] == "skip_duplicate_recent"

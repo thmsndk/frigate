@@ -21,6 +21,7 @@ import { IconType } from "react-icons/lib";
 export type CurationBadgeKind =
   | "duplicate_recent"
   | "duplicate_library"
+  | "one_per_burst"
   | "add"
   | "review"
   | "new_scene"
@@ -42,6 +43,9 @@ export function getCurationBadgeKind(
 
   if (suggestedAction === "skip_duplicate_recent") {
     return "duplicate_recent";
+  }
+  if (suggestedAction === "one_per_burst") {
+    return "one_per_burst";
   }
   if (
     suggestedAction === "skip_duplicate_library" ||
@@ -93,6 +97,12 @@ export function getCurationBadgePresentation(
         kind,
         className: "border-white/20 bg-black/70 text-gray-200",
         Icon: LuLayers,
+      };
+    case "one_per_burst":
+      return {
+        kind,
+        className: "border-slate-400/40 bg-slate-800/90 text-slate-200",
+        Icon: HiSquare2Stack,
       };
     case "add":
       return {
@@ -211,6 +221,7 @@ export function shouldShowSimilaritySubtitle(
     !kind ||
     kind === "duplicate_recent" ||
     kind === "duplicate_library" ||
+    kind === "one_per_burst" ||
     kind === "new_scene"
   ) {
     return false;
@@ -370,9 +381,9 @@ export function getCurationTooltipKey(
 
   if (
     presentation.kind === "review" &&
-    (similarity?.duplicateGroupSize ?? 1) > 1
+    similarity?.trainingPick
   ) {
-    return "review_burst";
+    return "review_training_pick";
   }
 
   if (
@@ -460,6 +471,7 @@ export function suggestionToSimilarityInfo(
     suggestedAction: suggestion.suggested_action,
     duplicateGroup: suggestion.duplicate_group,
     duplicateGroupSize: suggestion.duplicate_group_size,
+    trainingPick: suggestion.training_pick,
   };
 }
 

@@ -455,10 +455,39 @@ def compute_train_suggestions(model_name: str) -> list[dict[str, Any]]:
             suggestion["duplicate_group"], 1
         )
 
+    _apply_burst_training_picks(suggestions)
+
     if not suggestions and not all_dataset_entries:
         return suggestions
 
     return suggestions
+
+
+def _apply_burst_training_picks(suggestions: list[dict[str, Any]]) -> None:
+    """Pick one suggested training frame per Recent burst — not always the first."""
+    by_group: dict[str, list[dict[str, Any]]] = {}
+    for suggestion in suggestions:
+        by_group.setdefault(suggestion["duplicate_group"], []).append(suggestion)
+
+    for members in by_group.values():
+        if len(members) <= 1:
+            continue
+
+        # v1: highest confidence in burst. Future: hard-positive / user preference.
+        training_pick = max(members, key=lambda item: item["confidence"])
+
+        for suggestion in members:
+            if suggestion is training_pick:
+                suggestion["training_pick"] = True
+                if suggestion["confidence"] >= HIGH_CONFIDENCE_THRESHOLD:
+                    suggestion["suggested_action"] = "add"
+                else:
+                    suggestion["suggested_action"] = "review"
+            elif suggestion["suggested_action"] == "skip_duplicate_recent":
+                suggestion["training_pick"] = False
+            else:
+                suggestion["suggested_action"] = "one_per_burst"
+                suggestion["training_pick"] = False
 
 
 def build_categorize_metadata(

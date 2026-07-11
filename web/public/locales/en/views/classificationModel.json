@@ -106,18 +106,20 @@
     "badge": {
       "duplicate_recent": "Repeat",
       "duplicate_library": "In library",
+      "one_per_burst": "One per burst",
       "add": "Add",
       "review": "Review",
       "new_scene": "New scene",
       "mislabel": "Mislabel?"
     },
     "tooltip": {
-      "duplicate_recent": "{{recentSimilarity}}% match to an earlier {{label}} in Recent (Repeat at ≥{{duplicateThreshold}}%).\nModel predicts {{label}} at {{confidence}}%.\nColored border = same burst group. Skip — keep one frame.",
+      "duplicate_recent": "{{recentSimilarity}}% match to an earlier {{label}} in Recent (Repeat at ≥{{duplicateThreshold}}%).\nModel predicts {{label}} at {{confidence}}%.\nSkip — another frame in this burst is enough.",
+      "one_per_burst": "Part of a {{groupSize}}-frame {{label}} burst. Add only one from this group.\nModel predicts {{label}} at {{confidence}}%.\nAnother tile is marked Add — skip this one.",
       "duplicate_library": "{{librarySimilarity}}% match to {{className}} in your training library (In library at ≥{{duplicateThreshold}}%).\nModel predicts {{label}} at {{confidence}}%.\nSkip — you already trained on this.",
       "add": "Model predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}% confidence).\nCompared to training library: {{librarySimilarity}}%. Compared to earlier Recent {{label}}: {{recentSimilarity}}%. Neither reaches {{duplicateThreshold}}% duplicate threshold.\nUse + to add.",
-      "add_burst": "Keeper frame — first of {{groupSize}} similar {{label}} shots in Recent.\nModel predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}%).\n{{repeatCount}} later shots match it (Repeat).\nCompared to training library: {{librarySimilarity}}%.\nUse + to add this one; skip the Repeat tiles.",
+      "add_burst": "Suggested add from this {{groupSize}}-frame {{label}} burst — highest model confidence in the group.\nModel predicts {{label}} at {{confidence}}%.\nAdd only this one; skip Repeats and One per burst tiles.",
       "review": "Model predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}%; this is below that).\nCompared to training library: {{librarySimilarity}}%. Compared to earlier Recent {{label}}: {{recentSimilarity}}%.\nClick the thumbnail to inspect, then use + to add or skip.",
-      "review_burst": "First of {{groupSize}} similar {{label}} shots in this Recent burst.\nModel predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}%).\nCompared to library: {{librarySimilarity}}%. This is the keeper frame — skip the Repeat tiles.\nClick the thumbnail to inspect.",
+      "review_training_pick": "Suggested add from this {{groupSize}}-frame {{label}} burst — highest confidence here, still below the Add threshold.\nModel predicts {{label}} at {{confidence}}% (Add needs ≥{{confidenceThreshold}}%).\nConsider adding this one if you agree; skip the rest of the burst.",
       "new_scene": "Model predicts {{label}} at {{confidence}}%.\nUnder {{duplicateThreshold}}% match to library ({{librarySimilarity}}%) and Recent — a new-looking scene.\nGood for diversity. Use + to add.",
       "mislabel": "Model predicts {{predicted}} at {{confidence}}%, but looks {{matchSimilarity}}% like {{relabelClass}} in your training library.\nConsider relabeling before adding."
     },

@@ -38,6 +38,7 @@ export type ClassificationSimilarityInfo = {
   suggestedAction?: string;
   duplicateGroup?: string;
   duplicateGroupSize?: number;
+  trainingPick?: boolean;
 };
 
 export type ClassificationItemData = {
@@ -87,6 +88,7 @@ export type TrainSuggestion = {
   suggested_action: string;
   duplicate_group?: string;
   duplicate_group_size?: number;
+  training_pick?: boolean;
 };
 
 export type ClassificationDatasetResponse = {
