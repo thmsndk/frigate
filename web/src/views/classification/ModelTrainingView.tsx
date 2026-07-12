@@ -61,7 +61,11 @@ import TrainFilterDialog from "@/components/overlay/dialog/TrainFilterDialog";
 import RecentSortToggle from "@/components/classification/RecentSortToggle";
 import DatasetAnalysisHeader from "@/components/classification/DatasetAnalysisHeader";
 import DatasetAnalysisBadge from "@/components/classification/DatasetAnalysisBadge";
-import DatasetIntraSimilarityIndicator from "@/components/classification/DatasetIntraSimilarityIndicator";
+import {
+  buildDatasetDiversityScoreConfig,
+  buildFrameBurstDiversityScoreConfig,
+  buildRecentSingleDiversityScoreConfig,
+} from "@/components/classification/SimilarityScoreBadge";
 import ClassBalanceStrip from "@/components/classification/ClassBalanceStrip";
 import ClassificationCurationBadge from "@/components/card/ClassificationCurationBadge";
 import useApiFilter from "@/hooks/use-api-filter";
@@ -1012,16 +1016,10 @@ function DatasetGrid({
     (filename: string) => {
       const analysis = analysisByFilename.get(filename);
       return (
-        <>
-          <DatasetAnalysisBadge
-            categoryName={categoryName}
-            analysis={analysis}
-          />
-          <DatasetIntraSimilarityIndicator
-            categoryName={categoryName}
-            analysis={analysis}
-          />
-        </>
+        <DatasetAnalysisBadge
+          categoryName={categoryName}
+          analysis={analysis}
+        />
       );
     },
     [analysisByFilename, categoryName],
@@ -1043,6 +1041,11 @@ function DatasetGrid({
                 clickable={selectedImages.length > 0}
                 selected={selectedImages.includes(entry.item.filename)}
                 i18nLibrary="views/classificationModel"
+                diversityScore={buildDatasetDiversityScoreConfig(
+                  categoryName,
+                  analysisByFilename.get(entry.item.filename),
+                  t,
+                )}
                 onClick={(data, _) => onClickImages([data.filename], true)}
               >
                 {renderDatasetActions(entry.item.filename)}
@@ -1089,12 +1092,13 @@ function DatasetGrid({
                   />
                 );
               }}
-              renderOverlayExtras={(data) => (
-                <DatasetIntraSimilarityIndicator
-                  categoryName={categoryName}
-                  analysis={analysisByFilename.get(data.filename)}
-                />
-              )}
+              overlayDiversityScore={(data) =>
+                buildDatasetDiversityScoreConfig(
+                  categoryName,
+                  analysisByFilename.get(data.filename),
+                  t,
+                )
+              }
               onClick={(data) => {
                 if (data) {
                   onClickImages([data.filename], true);
@@ -1327,6 +1331,7 @@ function StateTrainGrid({
                   showArea={false}
                   showInteractionHint={selectedImages.length === 0}
                   focusMode={focusMode}
+                  diversityScore={buildRecentSingleDiversityScoreConfig(data)}
                   onClick={(data, meta) => {
                     if (selectedImages.length === 0 && !meta) {
                       setPreviewItem(data);
@@ -1381,6 +1386,9 @@ function StateTrainGrid({
                     hideRepeatBadge
                   />
                 )}
+                overlayDiversityScore={(data) =>
+                  buildFrameBurstDiversityScoreConfig(data, entry.items.length)
+                }
                 onClick={(data) => {
                   if (data) {
                     onClickImages([data.filename], true);

@@ -35,6 +35,10 @@ import {
 } from "../mobile/MobilePage";
 import ClassificationCurationBadge from "./ClassificationCurationBadge";
 import {
+  DiversityScoreBadge,
+  DiversityScoreConfig,
+} from "@/components/classification/SimilarityScoreBadge";
+import {
   formatStackLabelSummary,
   summarizeStackLabelCounts,
   CLASSIFICATION_OVERLAY_GRID_CLASS,
@@ -55,6 +59,7 @@ type ClassificationCardProps = {
   showInteractionHint?: boolean;
   focusMode?: boolean;
   topOverlay?: React.ReactNode;
+  diversityScore?: DiversityScoreConfig;
   showCurationBadge?: boolean;
   showScore?: boolean;
   showFooter?: boolean;
@@ -82,6 +87,7 @@ export const ClassificationCard = forwardRef<
     showInteractionHint = false,
     focusMode = false,
     topOverlay,
+    diversityScore,
     showCurationBadge = true,
     showScore = true,
     showFooter = true,
@@ -133,6 +139,10 @@ export const ClassificationCard = forwardRef<
 
     return imgRef.current.naturalWidth * imgRef.current.naturalHeight;
   }, [showArea, imageLoaded]);
+
+  const showDiversityScore = diversityScore != undefined && diversityScore.score > 0;
+  const diversityBelowPixelBadge =
+    showDiversityScore && imageArea != undefined && !count;
 
   return (
     <div
@@ -234,10 +244,25 @@ export const ClassificationCard = forwardRef<
         />
       )}
       {topOverlay}
+      {showDiversityScore && (
+        <DiversityScoreBadge
+          {...diversityScore}
+          positionClassName={
+            diversityBelowPixelBadge
+              ? "absolute right-1 top-8"
+              : "absolute right-1 top-1"
+          }
+        />
+      )}
       {count && (
-        <div className="absolute right-2 top-2 flex flex-row items-center gap-1">
-          <div className="text-gray-200">{count}</div>{" "}
-          <HiSquare2Stack className="text-gray-200" />
+        <div
+          className={cn(
+            "absolute right-1 z-10 flex flex-row items-center gap-0.5 text-[11px] text-gray-200",
+            showDiversityScore ? "top-8" : "top-2",
+          )}
+        >
+          <div>{count}</div>
+          <HiSquare2Stack />
         </div>
       )}
       {stackLabelCounts && stackLabelCounts.length > 0 && (
@@ -338,13 +363,15 @@ type GroupedClassificationCardProps = {
   collapsedShowCuration?: boolean;
   collapsedShowScore?: boolean;
   collapsedShowFooter?: boolean;
+  overlayDiversityScore?: (
+    data: ClassificationItemData,
+  ) => DiversityScoreConfig | undefined;
   stackTitle?: string;
   stackDescription?: string;
   overlayFocusMode?: boolean;
   overlayGridClassName?: string;
   shouldShowOverlayBadge?: (data: ClassificationItemData) => boolean;
   renderOverlayBadge?: (data: ClassificationItemData) => React.ReactNode;
-  renderOverlayExtras?: (data: ClassificationItemData) => React.ReactNode;
   onClick: (data: ClassificationItemData | undefined) => void;
   children?: (data: ClassificationItemData) => React.ReactNode;
 };
@@ -356,7 +383,7 @@ type GroupedStackOverlayTileProps = {
   overlayFocusMode?: boolean;
   showBadge: boolean;
   renderOverlayBadge?: (data: ClassificationItemData) => React.ReactNode;
-  renderOverlayExtras?: (data: ClassificationItemData) => React.ReactNode;
+  diversityScore?: DiversityScoreConfig;
   children?: React.ReactNode;
 };
 
@@ -367,14 +394,13 @@ function GroupedStackOverlayTile({
   overlayFocusMode,
   showBadge,
   renderOverlayBadge,
-  renderOverlayExtras,
+  diversityScore,
   children,
 }: GroupedStackOverlayTileProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   return (
     <div className="relative aspect-square w-full">
-      {imageLoaded && renderOverlayExtras?.(data)}
       {showBadge && imageLoaded && renderOverlayBadge?.(data)}
       <ClassificationCard
         data={data}
@@ -384,6 +410,7 @@ function GroupedStackOverlayTile({
         i18nLibrary={i18nLibrary}
         focusMode={overlayFocusMode}
         showCurationBadge={renderOverlayBadge === undefined}
+        diversityScore={diversityScore}
         imageLoading="eager"
         onImageLoad={() => setImageLoaded(true)}
         onClick={() => {}}
@@ -405,13 +432,13 @@ export function GroupedClassificationCard({
   collapsedShowCuration = true,
   collapsedShowScore = true,
   collapsedShowFooter = true,
+  overlayDiversityScore,
   stackTitle,
   stackDescription,
   overlayFocusMode = false,
   overlayGridClassName = CLASSIFICATION_OVERLAY_GRID_CLASS,
   shouldShowOverlayBadge,
   renderOverlayBadge,
-  renderOverlayExtras,
   onClick,
   children,
 }: GroupedClassificationCardProps) {
@@ -663,7 +690,7 @@ export function GroupedClassificationCard({
                         overlayFocusMode={overlayFocusMode}
                         showBadge={showBadge}
                         renderOverlayBadge={renderOverlayBadge}
-                        renderOverlayExtras={renderOverlayExtras}
+                        diversityScore={overlayDiversityScore?.(data)}
                       >
                         {children?.(data)}
                       </GroupedStackOverlayTile>

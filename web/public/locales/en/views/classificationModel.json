@@ -114,7 +114,8 @@
     },
     "tooltip": {
       "mislabel": "Looks {{interSimilarity}}% like {{otherClass}} but is labeled {{category}} (same-class match: {{intraSimilarity}}%).\n\nCheck whether this image belongs in another class before training.",
-      "intraSimilarity": "{{score}}% similar to the closest other image in {{category}}.\n\nHigher means this example is near-duplicate of another in the class; lower means it adds more variety.",
+      "intraSimilarity": "{{score}}% similar to the closest other image in {{category}}.\n\n{{matchCount}} other image(s) are at least {{duplicateThreshold}}% similar.{{stackNote}}\n\nCompares to every image in this class (including frames inside collapsed stacks — the score uses the single closest match). Lower % (greener) = more variety; higher % (amber) = near-duplicate.",
+      "intraSimilarityStackNote": " Part of a {{stackSize}}-image duplicate stack.",
       "diversity": {
         "low": "Low variety — images in this class match each other closely (avg {{avg}}% across {{count}} images).\n\nThe model may not learn much visual range. Add different angles, lighting, or scenes.",
         "medium": "Moderate variety (avg {{avg}}% match across {{count}} images).\n\nSome overlap is fine; a few more distinct examples can help generalization.",
@@ -170,7 +171,11 @@
     }
   },
   "similarity": {
-    "likeClass": "{{similarity}}% like {{className}}"
+    "likeClass": "{{similarity}}% like {{className}}",
+    "tooltip": {
+      "recentBurst": "{{score}}% average similarity to the other {{peerCount}} frames in this {{label}} burst ({{frameCount}} total).\n\nBurst-internal only — not compared to other tiles on the grid. Lower % (greener) = more variety within the burst; higher % (amber) = tighter duplicate cluster.",
+      "recentSingle": "{{score}}% like the closest match for {{label}}.\n\nCompared to your training library ({{libraryPct}}%) and earlier Recent frames ({{recentPct}}%) — including frames inside collapsed bursts, using the single closest match.\n\nLower % (greener) = more distinct from what you already have; higher % (amber) = likely repeat."
+    }
   },
   "suggestedAction": {
     "skip_duplicate_recent": "→ Skip (repeat in Recent)",
