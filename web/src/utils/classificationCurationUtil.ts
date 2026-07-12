@@ -186,6 +186,7 @@ export function getCurationBadgePresentation(
 }
 
 export const CURATION_DUPLICATE_THRESHOLD = 90;
+export const CURATION_RECENT_BURST_THRESHOLD = 85;
 
 export function isInLibraryAction(suggestedAction?: string): boolean {
   return (
@@ -805,6 +806,7 @@ export function buildCurationTooltipValues(
     predicted: label,
     confidence: confidencePct,
     duplicateThreshold: CURATION_DUPLICATE_THRESHOLD,
+    recentDuplicateThreshold: CURATION_RECENT_BURST_THRESHOLD,
     similarity: maxSim,
     recentSimilarity: recentSim,
     librarySimilarity: librarySim,

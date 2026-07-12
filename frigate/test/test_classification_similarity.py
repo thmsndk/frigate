@@ -34,6 +34,14 @@ class TestClassificationSimilarity:
         action = compute_suggested_action(0.95, 0.875, 1.0, 0.2, "clear")
         assert action == "skip_duplicate_recent"
 
+    def test_compute_suggested_action_recent_duplicate_at_89(self):
+        action = compute_suggested_action(0.56, 0.0, 0.89, 0.2, "closed")
+        assert action == "skip_duplicate_recent"
+
+    def test_compute_suggested_action_recent_below_burst_threshold_stays_candidate(self):
+        action = compute_suggested_action(0.56, 0.0, 0.84, 0.2, "closed")
+        assert action == "candidate"
+
     def test_compute_suggested_action_library_beats_recent(self):
         action = compute_suggested_action(0.95, 0.95, 1.0, 0.2, "clear")
         assert action == "skip_duplicate_library"

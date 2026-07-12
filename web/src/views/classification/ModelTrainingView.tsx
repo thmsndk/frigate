@@ -61,6 +61,7 @@ import TrainFilterDialog from "@/components/overlay/dialog/TrainFilterDialog";
 import RecentSortToggle from "@/components/classification/RecentSortToggle";
 import DatasetAnalysisHeader from "@/components/classification/DatasetAnalysisHeader";
 import DatasetAnalysisBadge from "@/components/classification/DatasetAnalysisBadge";
+import DatasetIntraSimilarityIndicator from "@/components/classification/DatasetIntraSimilarityIndicator";
 import ClassBalanceStrip from "@/components/classification/ClassBalanceStrip";
 import ClassificationCurationBadge from "@/components/card/ClassificationCurationBadge";
 import useApiFilter from "@/hooks/use-api-filter";
@@ -627,7 +628,7 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
           </div>
         )}
       </div>
-      {Object.keys(dataset || {}).length > 0 && (
+      {pageToggle === "train" && Object.keys(dataset || {}).length > 0 && (
         <ClassBalanceStrip categories={dataset} />
       )}
       {pageToggle == "train" ? (
@@ -1007,6 +1008,25 @@ function DatasetGrid({
     [categoryName, classes, modelName, onDelete, onReclassify, t],
   );
 
+  const renderDatasetOverlays = useCallback(
+    (filename: string) => {
+      const analysis = analysisByFilename.get(filename);
+      return (
+        <>
+          <DatasetAnalysisBadge
+            categoryName={categoryName}
+            analysis={analysis}
+          />
+          <DatasetIntraSimilarityIndicator
+            categoryName={categoryName}
+            analysis={analysis}
+          />
+        </>
+      );
+    },
+    [analysisByFilename, categoryName],
+  );
+
   return (
     <div
       ref={contentRef}
@@ -1014,13 +1034,9 @@ function DatasetGrid({
     >
       {displayEntries.map((entry) => {
         if (entry.kind === "single") {
-          const analysis = analysisByFilename.get(entry.item.filename);
           return (
             <div key={entry.item.filename} className="relative aspect-square w-full">
-              <DatasetAnalysisBadge
-                categoryName={categoryName}
-                analysis={analysis}
-              />
+              {renderDatasetOverlays(entry.item.filename)}
               <ClassificationCard
                 data={entry.item}
                 showArea={false}
@@ -1073,6 +1089,12 @@ function DatasetGrid({
                   />
                 );
               }}
+              renderOverlayExtras={(data) => (
+                <DatasetIntraSimilarityIndicator
+                  categoryName={categoryName}
+                  analysis={analysisByFilename.get(data.filename)}
+                />
+              )}
               onClick={(data) => {
                 if (data) {
                   onClickImages([data.filename], true);

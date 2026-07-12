@@ -344,6 +344,7 @@ type GroupedClassificationCardProps = {
   overlayGridClassName?: string;
   shouldShowOverlayBadge?: (data: ClassificationItemData) => boolean;
   renderOverlayBadge?: (data: ClassificationItemData) => React.ReactNode;
+  renderOverlayExtras?: (data: ClassificationItemData) => React.ReactNode;
   onClick: (data: ClassificationItemData | undefined) => void;
   children?: (data: ClassificationItemData) => React.ReactNode;
 };
@@ -355,6 +356,7 @@ type GroupedStackOverlayTileProps = {
   overlayFocusMode?: boolean;
   showBadge: boolean;
   renderOverlayBadge?: (data: ClassificationItemData) => React.ReactNode;
+  renderOverlayExtras?: (data: ClassificationItemData) => React.ReactNode;
   children?: React.ReactNode;
 };
 
@@ -365,12 +367,14 @@ function GroupedStackOverlayTile({
   overlayFocusMode,
   showBadge,
   renderOverlayBadge,
+  renderOverlayExtras,
   children,
 }: GroupedStackOverlayTileProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
 
   return (
     <div className="relative aspect-square w-full">
+      {imageLoaded && renderOverlayExtras?.(data)}
       {showBadge && imageLoaded && renderOverlayBadge?.(data)}
       <ClassificationCard
         data={data}
@@ -407,6 +411,7 @@ export function GroupedClassificationCard({
   overlayGridClassName = CLASSIFICATION_OVERLAY_GRID_CLASS,
   shouldShowOverlayBadge,
   renderOverlayBadge,
+  renderOverlayExtras,
   onClick,
   children,
 }: GroupedClassificationCardProps) {
@@ -658,6 +663,7 @@ export function GroupedClassificationCard({
                         overlayFocusMode={overlayFocusMode}
                         showBadge={showBadge}
                         renderOverlayBadge={renderOverlayBadge}
+                        renderOverlayExtras={renderOverlayExtras}
                       >
                         {children?.(data)}
                       </GroupedStackOverlayTile>

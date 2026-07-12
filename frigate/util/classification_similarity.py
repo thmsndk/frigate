@@ -18,6 +18,7 @@ SIMILARITY_INDEX_VERSION = 1
 DHASH_BITS = 64
 
 DUPLICATE_THRESHOLD = 0.90
+RECENT_BURST_THRESHOLD = 0.85
 MISLABEL_THRESHOLD = 0.85
 NEW_SCENARIO_THRESHOLD = 0.70
 
@@ -263,7 +264,7 @@ def compute_suggested_action(
         return f"relabel_to_{best_other_class}"
     if max_same_dataset_similarity >= DUPLICATE_THRESHOLD:
         return "skip_duplicate_library"
-    if max_same_recent_similarity >= DUPLICATE_THRESHOLD:
+    if max_same_recent_similarity >= RECENT_BURST_THRESHOLD:
         return "skip_duplicate_recent"
     if (
         max(max_same_class_similarity, max_other_class_similarity)
@@ -296,7 +297,7 @@ def _best_prior_train_match(
     image_hash: str,
     prior_entries: list[tuple[str, str, str, float]],
     cluster_roots: dict[str, float],
-    duplicate_threshold: float = DUPLICATE_THRESHOLD,
+    duplicate_threshold: float = RECENT_BURST_THRESHOLD,
 ) -> tuple[float, str | None, float]:
     """Best similarity to earlier train images and resulting cluster root timestamp."""
     best_similarity = 0.0

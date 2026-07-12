@@ -113,8 +113,15 @@
       "mislabel": "Mislabel?"
     },
     "tooltip": {
-      "mislabel": "Looks {{interSimilarity}}% like {{otherClass}} but is labeled {{category}} (same-class match: {{intraSimilarity}}%).\n\nCheck whether this image belongs in another class before training."
-    }
+      "mislabel": "Looks {{interSimilarity}}% like {{otherClass}} but is labeled {{category}} (same-class match: {{intraSimilarity}}%).\n\nCheck whether this image belongs in another class before training.",
+      "intraSimilarity": "{{score}}% similar to the closest other image in {{category}}.\n\nHigher means this example is near-duplicate of another in the class; lower means it adds more variety.",
+      "diversity": {
+        "low": "Low variety — images in this class match each other closely (avg {{avg}}% across {{count}} images).\n\nThe model may not learn much visual range. Add different angles, lighting, or scenes.",
+        "medium": "Moderate variety (avg {{avg}}% match across {{count}} images).\n\nSome overlap is fine; a few more distinct examples can help generalization.",
+        "high": "Good variety (avg {{avg}}% match across {{count}} images).\n\nDifferent looks and scenarios help the model generalize within this class."
+      }
+    },
+    "intraSimilarityShort": "{{score}}%"
   },
   "classBalance": {
     "warningEmpty": "Empty class",
@@ -147,13 +154,13 @@
       "mislabel": "Mislabel?"
     },
     "tooltip": {
-      "duplicate_recent": "Repeat — {{groupSize}}-frame burst. {{recentSimilarity}}% visual match to an earlier {{label}} in Recent (≥{{duplicateThreshold}}% = duplicate).\n\nThis frame: {{label}} at {{confidence}}%. Burst confidence {{lowestConfidence}}–{{highestConfidence}}%.",
+      "duplicate_recent": "Repeat — {{groupSize}}-frame burst. {{recentSimilarity}}% visual match to an earlier {{label}} in Recent (≥{{recentDuplicateThreshold}}% = duplicate).\n\nThis frame: {{label}} at {{confidence}}%. Burst confidence {{lowestConfidence}}–{{highestConfidence}}%.",
       "duplicate_library": "In library — {{librarySimilarity}}% visual match to {{className}} in your training library (≥{{duplicateThreshold}}%).\n\nModel predicts {{label}} at {{confidence}}%.",
       "hard_positive_in_burst": "Lower conf — ranked {{confidenceRank}} of {{groupSize}} in this burst (1 = lowest confidence).\n\nThis frame: {{confidence}}%. Burst range: {{lowestConfidence}}–{{highestConfidence}}% (spread {{confidenceSpread}} pts). Flagged as 1 of {{hardPositivePoolSize}} bottom frames (~25% of burst when spread ≥1%).\n\nThe model is less sure on this frame than on most repeats here.",
       "most_diverse_in_burst": "Most different — ranked {{diversityRank}} of {{groupSize}} (1 = least like the other burst frames).\n\nAvg {{avgBurstSimilarity}}% visual match to the other {{groupSize}} frames. Flagged as 1 of {{diversityPoolSize}} most-unique frames (~25%).\n\nBursts are not always pixel-identical — this frame varies most from the group.",
       "training_pick_both_signals": "Lower conf + Most different — see each badge tooltip for this frame's ranks and numbers.",
       "training_pick": "Burst candidate — hover each badge for why this frame was flagged.",
-      "candidate": "Candidate — not flagged as a duplicate; worth reviewing for your training set.\nModel predicts {{label}} at {{confidence}}% (informational — not proof the label is correct).\nLibrary match: {{librarySimilarity}}%. Recent {{label}} match: {{recentSimilarity}}%.\nYou verify: + if correct, relabel if not, or skip.",
+      "candidate": "Candidate — not flagged as a duplicate; worth reviewing for your training set.\nModel predicts {{label}} at {{confidence}}% (informational — not proof the label is correct).\nLibrary match: {{librarySimilarity}}%. Recent {{label}} match: {{recentSimilarity}}% (Recent duplicate threshold: {{recentDuplicateThreshold}}%).\nYou verify: + if correct, relabel if not, or skip.",
       "new_scene": "New scene — under {{duplicateThreshold}}% visual match to library ({{librarySimilarity}}%) and Recent; looks different from what you have.\nModel predicts {{label}} at {{confidence}}% (informational).\nOften good for diversity if you verify the label. You decide: +, relabel, or skip.",
       "mislabel": "Mislabel? — model predicts {{predicted}} at {{confidence}}%, but looks {{matchSimilarity}}% like {{relabelClass}} in your training library.\nSimilarity hint only — you decide whether to relabel, add as-is, or skip."
     },

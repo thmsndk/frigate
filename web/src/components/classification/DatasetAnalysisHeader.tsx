@@ -2,6 +2,8 @@ import { DatasetCategoryAnalysisResponse } from "@/types/classification";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { LuTriangleAlert } from "react-icons/lu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipPortal } from "@radix-ui/react-tooltip";
 
 type DatasetAnalysisHeaderProps = {
   categoryName: string;
@@ -48,12 +50,24 @@ export default function DatasetAnalysisHeader({
       {analysis && imageCount > 0 && (
         <>
           <span aria-hidden>·</span>
-          <span>
-            {t("datasetAnalysis.diversityLabel")}:{" "}
-            <span className={cn("font-medium", diversityClassName)}>
-              {diversityLabel}
-            </span>
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex cursor-help items-center gap-1">
+                {t("datasetAnalysis.diversityLabel")}:{" "}
+                <span className={cn("font-medium", diversityClassName)}>
+                  {diversityLabel}
+                </span>
+              </span>
+            </TooltipTrigger>
+            <TooltipPortal>
+              <TooltipContent className="max-w-xs whitespace-pre-line text-sm leading-snug">
+                {t(`datasetAnalysis.tooltip.diversity.${analysis.diversity}`, {
+                  avg: Math.round(analysis.avg_intra_similarity * 100),
+                  count: imageCount,
+                })}
+              </TooltipContent>
+            </TooltipPortal>
+          </Tooltip>
           {analysis.suggested_remove_count > 0 && (
             <>
               <span aria-hidden>·</span>
