@@ -100,6 +100,32 @@
     "addedConfidence": "Added · was {{score}}%",
     "relabeled": "Was {{from}} {{fromScore}}% → {{to}}"
   },
+  "datasetAnalysis": {
+    "diversityLabel": "Diversity",
+    "diversity": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "removeDuplicates_one": "remove {{count}} duplicate",
+    "removeDuplicates_other": "remove {{count}} duplicates",
+    "badge": {
+      "mislabel": "Mislabel?"
+    },
+    "tooltip": {
+      "mislabel": "Looks {{interSimilarity}}% like {{otherClass}} but is labeled {{category}} (same-class match: {{intraSimilarity}}%).\n\nCheck whether this image belongs in another class before training."
+    }
+  },
+  "classBalance": {
+    "warningEmpty": "Empty class",
+    "warningImbalance": "Imbalanced classes",
+    "warningBoth": "Empty and imbalanced classes",
+    "tooltipEmpty": "At least one class has 0 training images. The model cannot learn that class until you add examples.",
+    "tooltipImbalance": "Largest class has {{max}} images vs smallest non-empty class with {{min}} — ratio over 3:1.\n\nConsider adding examples to underrepresented classes or pruning duplicates from dominant ones."
+  },
+  "stack": {
+    "description": "{{count}} similar frames in this burst ({{summary}}). Open to review signal badges or add one example."
+  },
   "sort": {
     "focus": "Focus",
     "focusCount": "Focus ({{visible}}/{{total}})",

@@ -203,6 +203,8 @@ export function isInRecentBurst(
 export type CurationBadgeStackOptions = {
   /** Focus mode: hide Repeat when library/signals already explain the tile. */
   focusMode?: boolean;
+  /** Collapsed stack overlay: the stack itself implies repeats. */
+  hideRepeatBadge?: boolean;
 };
 
 export function isFocusReviewTile(item: ClassificationItemData): boolean {
@@ -226,6 +228,10 @@ export function shouldShowRepeatBadge(
   similarity?: ClassificationSimilarityInfo,
   options?: CurationBadgeStackOptions,
 ): boolean {
+  if (options?.hideRepeatBadge) {
+    return false;
+  }
+
   if (!isInRecentBurst(similarity)) {
     return false;
   }
@@ -741,6 +747,10 @@ export function buildCurationBadgeStack(
     if (repeatBadge) {
       items.push({ ...repeatBadge, faded: fadeSecondary && !isMislabel });
     }
+  }
+
+  if (options?.hideRepeatBadge) {
+    return items.filter((item) => item.kind !== "duplicate_recent");
   }
 
   return items;

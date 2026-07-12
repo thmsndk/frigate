@@ -18,6 +18,7 @@ type ClassificationCurationBadgeProps = {
   confidence?: number;
   similarity?: ClassificationSimilarityInfo;
   focusMode?: boolean;
+  hideRepeatBadge?: boolean;
   className?: string;
 };
 
@@ -26,13 +27,14 @@ export default function ClassificationCurationBadge({
   confidence,
   similarity,
   focusMode = false,
+  hideRepeatBadge = false,
   className,
 }: ClassificationCurationBadgeProps) {
   const { t } = useTranslation(["views/classificationModel"]);
 
   const badgeStack = useMemo(
-    () => buildCurationBadgeStack(similarity, { focusMode }),
-    [similarity, focusMode],
+    () => buildCurationBadgeStack(similarity, { focusMode, hideRepeatBadge }),
+    [similarity, focusMode, hideRepeatBadge],
   );
 
   const baseKind = getPrimaryCurationBadgeKind(similarity);

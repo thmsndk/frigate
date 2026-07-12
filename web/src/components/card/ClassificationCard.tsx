@@ -34,6 +34,11 @@ import {
   MobilePageTrigger,
 } from "../mobile/MobilePage";
 import ClassificationCurationBadge from "./ClassificationCurationBadge";
+import {
+  formatStackLabelSummary,
+  summarizeStackLabelCounts,
+  CLASSIFICATION_OVERLAY_GRID_CLASS,
+} from "@/utils/classificationStackUtil";
 
 type ClassificationCardProps = {
   className?: string;
@@ -45,9 +50,16 @@ type ClassificationCardProps = {
   i18nLibrary: string;
   showArea?: boolean;
   count?: number;
+  stackLabelCounts?: { label: string; count: number }[];
   duplicateGroupOutline?: string;
   showInteractionHint?: boolean;
   focusMode?: boolean;
+  topOverlay?: React.ReactNode;
+  showCurationBadge?: boolean;
+  showScore?: boolean;
+  showFooter?: boolean;
+  imageLoading?: "lazy" | "eager";
+  onImageLoad?: () => void;
   onClick: (data: ClassificationItemData, meta: boolean) => void;
   children?: React.ReactNode;
 };
@@ -65,9 +77,16 @@ export const ClassificationCard = forwardRef<
     i18nLibrary,
     showArea = true,
     count,
+    stackLabelCounts,
     duplicateGroupOutline,
     showInteractionHint = false,
     focusMode = false,
+    topOverlay,
+    showCurationBadge = true,
+    showScore = true,
+    showFooter = true,
+    imageLoading = "lazy",
+    onImageLoad,
     onClick,
     children,
   },
@@ -75,6 +94,15 @@ export const ClassificationCard = forwardRef<
 ) {
   const { t } = useTranslation([i18nLibrary]);
   const [imageLoaded, setImageLoaded] = useState(false);
+
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [data.filepath]);
+
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+    onImageLoad?.();
+  };
 
   const scoreStatus = useMemo(() => {
     if (!data.score || !threshold) {
@@ -138,6 +166,9 @@ export const ClassificationCard = forwardRef<
         onClick(data, true);
       }}
     >
+      {!imageLoaded && (
+        <div className="absolute inset-0 animate-pulse bg-secondary/40" />
+      )}
       {showInteractionHint ? (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -157,8 +188,8 @@ export const ClassificationCard = forwardRef<
                   : undefined
               }
               draggable={false}
-              loading="lazy"
-              onLoad={() => setImageLoaded(true)}
+              loading={imageLoading}
+              onLoad={handleImageLoad}
               src={`${baseUrl}${data.filepath}`}
               alt=""
             />
@@ -188,13 +219,13 @@ export const ClassificationCard = forwardRef<
               : undefined
           }
           draggable={false}
-          loading="lazy"
-          onLoad={() => setImageLoaded(true)}
+          loading={imageLoading}
+          onLoad={handleImageLoad}
           src={`${baseUrl}${data.filepath}`}
         />
       )}
       <ImageShadowOverlay upperClassName="z-0" lowerClassName="h-[30%] z-0" />
-      {data.similarity?.suggestedAction && (
+      {showCurationBadge && data.similarity?.suggestedAction && (
         <ClassificationCurationBadge
           predictedLabel={data.name}
           confidence={data.score}
@@ -202,10 +233,27 @@ export const ClassificationCard = forwardRef<
           focusMode={focusMode}
         />
       )}
+      {topOverlay}
       {count && (
         <div className="absolute right-2 top-2 flex flex-row items-center gap-1">
           <div className="text-gray-200">{count}</div>{" "}
           <HiSquare2Stack className="text-gray-200" />
+        </div>
+      )}
+      {stackLabelCounts && stackLabelCounts.length > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-2 pb-2 pt-5">
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-medium leading-tight text-white">
+            {stackLabelCounts.map(({ label, count: labelCount }) => (
+              <span key={label} className="smart-capitalize">
+                {label.toLowerCase() === "none"
+                  ? t("details.none")
+                  : label.toLowerCase() === "unknown"
+                    ? t("details.unknown")
+                    : label.replaceAll("_", " ")}{" "}
+                {labelCount}
+              </span>
+            ))}
+          </div>
         </div>
       )}
       {!count && imageArea != undefined && (
@@ -214,6 +262,7 @@ export const ClassificationCard = forwardRef<
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 h-[50%] bg-gradient-to-t from-black/60 to-transparent" />
+      {showFooter && (
       <div className="absolute bottom-0 flex w-full select-none flex-row items-center justify-between gap-2 p-2">
         <div
           className={cn(
@@ -228,7 +277,7 @@ export const ClassificationCard = forwardRef<
                 ? t("details.none")
                 : data.name}
           </div>
-          {data.score != undefined && (
+          {showScore && data.score != undefined && (
             <div
               className={cn(
                 "",
@@ -271,6 +320,7 @@ export const ClassificationCard = forwardRef<
           {children}
         </div>
       </div>
+      )}
     </div>
   );
 });
@@ -281,11 +331,64 @@ type GroupedClassificationCardProps = {
   threshold?: ClassificationThreshold;
   selectedItems: string[];
   i18nLibrary: string;
-  objectType: string;
+  objectType?: string;
   noClassificationLabel?: string;
+  representative?: ClassificationItemData;
+  collapsedTopOverlay?: React.ReactNode;
+  collapsedShowCuration?: boolean;
+  collapsedShowScore?: boolean;
+  collapsedShowFooter?: boolean;
+  stackTitle?: string;
+  stackDescription?: string;
+  overlayFocusMode?: boolean;
+  overlayGridClassName?: string;
+  shouldShowOverlayBadge?: (data: ClassificationItemData) => boolean;
+  renderOverlayBadge?: (data: ClassificationItemData) => React.ReactNode;
   onClick: (data: ClassificationItemData | undefined) => void;
   children?: (data: ClassificationItemData) => React.ReactNode;
 };
+
+type GroupedStackOverlayTileProps = {
+  data: ClassificationItemData;
+  threshold?: ClassificationThreshold;
+  i18nLibrary: string;
+  overlayFocusMode?: boolean;
+  showBadge: boolean;
+  renderOverlayBadge?: (data: ClassificationItemData) => React.ReactNode;
+  children?: React.ReactNode;
+};
+
+function GroupedStackOverlayTile({
+  data,
+  threshold,
+  i18nLibrary,
+  overlayFocusMode,
+  showBadge,
+  renderOverlayBadge,
+  children,
+}: GroupedStackOverlayTileProps) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  return (
+    <div className="relative aspect-square w-full">
+      {showBadge && imageLoaded && renderOverlayBadge?.(data)}
+      <ClassificationCard
+        data={data}
+        threshold={threshold}
+        selected={false}
+        clickable={false}
+        i18nLibrary={i18nLibrary}
+        focusMode={overlayFocusMode}
+        showCurationBadge={renderOverlayBadge === undefined}
+        imageLoading="eager"
+        onImageLoad={() => setImageLoaded(true)}
+        onClick={() => {}}
+      >
+        {children}
+      </ClassificationCard>
+    </div>
+  );
+}
 export function GroupedClassificationCard({
   group,
   classifiedEvent,
@@ -293,6 +396,17 @@ export function GroupedClassificationCard({
   selectedItems,
   i18nLibrary,
   noClassificationLabel = "details.none",
+  representative,
+  collapsedTopOverlay,
+  collapsedShowCuration = true,
+  collapsedShowScore = true,
+  collapsedShowFooter = true,
+  stackTitle,
+  stackDescription,
+  overlayFocusMode = false,
+  overlayGridClassName = CLASSIFICATION_OVERLAY_GRID_CLASS,
+  shouldShowOverlayBadge,
+  renderOverlayBadge,
   onClick,
   children,
 }: GroupedClassificationCardProps) {
@@ -303,6 +417,10 @@ export function GroupedClassificationCard({
   // data
 
   const bestItem = useMemo<ClassificationItemData | undefined>(() => {
+    if (representative) {
+      return representative;
+    }
+
     let best: undefined | ClassificationItemData = undefined;
 
     group.forEach((item) => {
@@ -331,7 +449,7 @@ export function GroupedClassificationCard({
             : bestTyped.name,
       score: classifiedEvent?.score,
     };
-  }, [group, classifiedEvent, noClassificationLabel, t]);
+  }, [group, classifiedEvent, noClassificationLabel, t, representative]);
 
   const bestScoreStatus = useMemo(() => {
     if (!bestItem?.score || !threshold) {
@@ -361,6 +479,27 @@ export function GroupedClassificationCard({
     return null;
   }
 
+  const collapsedCardData = useMemo(() => {
+    if (collapsedShowCuration) {
+      return bestItem;
+    }
+    return { ...bestItem, similarity: undefined };
+  }, [bestItem, collapsedShowCuration]);
+
+  const stackLabelCounts = useMemo(
+    () => summarizeStackLabelCounts(group),
+    [group],
+  );
+
+  const modalTitle =
+    stackTitle ??
+    (stackLabelCounts.length > 0
+      ? formatStackLabelSummary(stackLabelCounts)
+      : undefined) ??
+    (classifiedEvent?.label && classifiedEvent.label !== "none"
+      ? classifiedEvent.label
+      : t(noClassificationLabel, { ns: i18nLibrary }));
+
   const Overlay = isDesktop ? Dialog : MobilePage;
   const Trigger = isDesktop ? DialogTrigger : MobilePageTrigger;
   const Content = isDesktop ? DialogContent : MobilePageContent;
@@ -373,12 +512,17 @@ export function GroupedClassificationCard({
   return (
     <>
       <ClassificationCard
-        data={bestItem}
+        data={collapsedCardData}
         threshold={threshold}
-        selected={selectedItems.includes(bestItem.filename)}
+        selected={group.some((item) => selectedItems.includes(item.filename))}
         clickable={true}
         i18nLibrary={i18nLibrary}
         count={group.length}
+        stackLabelCounts={stackLabelCounts}
+        topOverlay={collapsedTopOverlay}
+        showCurationBadge={collapsedShowCuration}
+        showScore={collapsedShowScore}
+        showFooter={collapsedShowFooter}
         onClick={(_, meta) => {
           if (meta || selectedItems.length > 0) {
             onClick(undefined);
@@ -398,16 +542,16 @@ export function GroupedClassificationCard({
         <Trigger asChild></Trigger>
         <Content
           className={cn(
-            "scrollbar-container",
-            isDesktop && "min-w-[50%] max-w-[65%]",
-            isMobile && "overflow-y-auto",
+            "flex max-h-[85dvh] flex-col overflow-hidden p-0",
+            isDesktop && "min-w-[80%] w-[95vw] max-w-[95vw]",
+            isMobile && "h-[85dvh]",
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <>
             <Header
               className={cn(
-                "mx-2 flex flex-row items-center gap-4",
+                "mx-2 shrink-0 flex flex-row items-center gap-4 border-b border-secondary/40 pb-3 pt-4",
                 isMobileOnly && "top-0 mx-4",
               )}
             >
@@ -418,9 +562,7 @@ export function GroupedClassificationCard({
                 )}
               >
                 <ContentTitle className="flex items-center gap-2 font-normal capitalize">
-                  {classifiedEvent?.label && classifiedEvent.label !== "none"
-                    ? classifiedEvent.label
-                    : t(noClassificationLabel, { ns: i18nLibrary })}
+                  {modalTitle}
                   {classifiedEvent?.label &&
                     classifiedEvent.label !== "none" &&
                     classifiedEvent.score !== undefined && (
@@ -452,7 +594,8 @@ export function GroupedClassificationCard({
                     )}
                 </ContentTitle>
                 <ContentDescription className={cn("", isMobile && "px-2")}>
-                  {time && (
+                  {stackDescription}
+                  {!stackDescription && time && (
                     <TimeAgo
                       className="text-sm text-secondary-foreground"
                       time={time}
@@ -492,28 +635,37 @@ export function GroupedClassificationCard({
                 </div>
               )}
             </Header>
-            <div
-              className={cn(
-                "grid w-full auto-rows-min grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8",
-                isDesktop && "p-2",
-                isMobile && "px-4 pb-4",
-              )}
-            >
-              {group.map((data: ClassificationItemData) => (
-                <div key={data.filename} className="aspect-square w-full">
-                  <ClassificationCard
-                    data={data}
-                    threshold={threshold}
-                    selected={false}
-                    clickable={false}
-                    i18nLibrary={i18nLibrary}
-                    onClick={() => {}}
-                  >
-                    {children?.(data)}
-                  </ClassificationCard>
+            {detailOpen && (
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div
+                  className={cn(
+                    overlayGridClassName,
+                    isDesktop && "p-2",
+                    isMobile && "px-4 pb-4",
+                  )}
+                >
+                  {group.map((data: ClassificationItemData) => {
+                    const showBadge = Boolean(
+                      renderOverlayBadge &&
+                        (shouldShowOverlayBadge?.(data) ?? true),
+                    );
+                    return (
+                      <GroupedStackOverlayTile
+                        key={data.filename}
+                        data={data}
+                        threshold={threshold}
+                        i18nLibrary={i18nLibrary}
+                        overlayFocusMode={overlayFocusMode}
+                        showBadge={showBadge}
+                        renderOverlayBadge={renderOverlayBadge}
+                      >
+                        {children?.(data)}
+                      </GroupedStackOverlayTile>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </>
         </Content>
       </Overlay>

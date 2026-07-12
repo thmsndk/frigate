@@ -44,6 +44,7 @@ from frigate.util.classification import (
 )
 from frigate.util.classification_similarity import (
     build_categorize_metadata,
+    compute_dataset_category_analysis,
     compute_train_suggestions,
     delete_image_metadata,
     index_image,
@@ -786,6 +787,58 @@ def get_classification_images(name: str):
             )
         ),
     )
+
+
+@router.get(
+    "/classification/{name}/dataset/{category}/analysis",
+    summary="Get dataset class similarity analysis",
+    description="""Returns intra-class duplicate and inter-class mislabel analysis for a dataset category.""",
+)
+def get_classification_dataset_analysis(request: Request, name: str, category: str):
+    config: FrigateConfig = request.app.frigate_config
+
+    if name not in config.classification.custom:
+        return JSONResponse(
+            content=(
+                {
+                    "success": False,
+                    "message": f"{name} is not a known classification model.",
+                }
+            ),
+            status_code=404,
+        )
+
+    sanitized_category = sanitize_filename(category)
+    analysis = compute_dataset_category_analysis(
+        sanitize_filename(name), sanitized_category
+    )
+    return JSONResponse(status_code=200, content=analysis)
+
+
+@router.get(
+    "/classification/{name}/dataset/{category}/analysis",
+    summary="Get dataset class similarity analysis",
+    description="""Returns intra-class duplicate and inter-class mislabel analysis for a dataset category.""",
+)
+def get_classification_dataset_analysis(request: Request, name: str, category: str):
+    config: FrigateConfig = request.app.frigate_config
+
+    if name not in config.classification.custom:
+        return JSONResponse(
+            content=(
+                {
+                    "success": False,
+                    "message": f"{name} is not a known classification model.",
+                }
+            ),
+            status_code=404,
+        )
+
+    sanitized_category = sanitize_filename(category)
+    analysis = compute_dataset_category_analysis(
+        sanitize_filename(name), sanitized_category
+    )
+    return JSONResponse(status_code=200, content=analysis)
 
 
 @router.get(

@@ -59,12 +59,17 @@ import { useNavigate } from "react-router-dom";
 import { IoMdArrowRoundBack } from "react-icons/io";
 import TrainFilterDialog from "@/components/overlay/dialog/TrainFilterDialog";
 import RecentSortToggle from "@/components/classification/RecentSortToggle";
+import DatasetAnalysisHeader from "@/components/classification/DatasetAnalysisHeader";
+import DatasetAnalysisBadge from "@/components/classification/DatasetAnalysisBadge";
+import ClassBalanceStrip from "@/components/classification/ClassBalanceStrip";
+import ClassificationCurationBadge from "@/components/card/ClassificationCurationBadge";
 import useApiFilter from "@/hooks/use-api-filter";
 import {
   ClassificationDatasetResponse,
   ClassificationImageMetadata,
   ClassificationItemData,
   ClassifiedEvent,
+  DatasetCategoryAnalysisResponse,
   RecentSortMode,
   TrainFilter,
   TrainSuggestionsResponse,
@@ -74,13 +79,23 @@ import {
   metadataFromApi,
   suggestionToSimilarityInfo,
   buildCurationTooltipValues,
-  buildRecentDuplicateGroupOutlineMap,
   getCurationTooltipKey,
-  getTileDecorationOutline,
   prepareRecentDisplayItems,
   DEFAULT_RECENT_SORT_MODE,
   RecentFocusStats,
 } from "@/utils/classificationCurationUtil";
+import {
+  buildDatasetStackDisplayEntries,
+  buildRecentStackDisplayEntries,
+  CLASSIFICATION_GRID_CLASS,
+  getDatasetMislabelAnalysis,
+  groupHasDatasetMislabel,
+  pickDatasetStackRepresentative,
+  formatStackLabelSummary,
+  pickRecentStackRepresentative,
+  shouldShowCurationBadgeInStackOverlay,
+  summarizeStackLabelCounts,
+} from "@/utils/classificationStackUtil";
 import { baseUrl } from "@/api/baseUrl";
 import {
   ClassificationCard,
@@ -157,6 +172,12 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
     useSWR<TrainSuggestionsResponse>(
       `classification/${model.name}/train/suggestions`,
     );
+  const datasetAnalysisKey =
+    pageToggle !== "train"
+      ? `classification/${model.name}/dataset/${pageToggle}/analysis`
+      : null;
+  const { data: datasetAnalysis, mutate: refreshDatasetAnalysis } =
+    useSWR<DatasetCategoryAnalysisResponse>(datasetAnalysisKey);
 
   const dataset = datasetResponse?.categories || {};
   const trainingMetadata = datasetResponse?.training_metadata;
@@ -170,6 +191,17 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
     return map;
   }, [suggestionsResponse]);
 
+  const datasetAnalysisByFilename = useMemo(() => {
+    const map = new Map<
+      string,
+      DatasetCategoryAnalysisResponse["images"][number]
+    >();
+    datasetAnalysis?.images.forEach((item) => {
+      map.set(item.filename, item);
+    });
+    return map;
+  }, [datasetAnalysis]);
+
   const [trainFilter, setTrainFilter] = useApiFilter<TrainFilter>();
   const [recentSortMode, setRecentSortMode] =
     useState<RecentSortMode>(DEFAULT_RECENT_SORT_MODE);
@@ -180,7 +212,8 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
     refreshTrain();
     refreshDataset();
     refreshSuggestions();
-  }, [refreshTrain, refreshDataset, refreshSuggestions]);
+    refreshDatasetAnalysis();
+  }, [refreshTrain, refreshDataset, refreshSuggestions, refreshDatasetAnalysis]);
 
   // image multiselect
 
@@ -337,6 +370,37 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
         });
     },
     [pageToggle, model, refreshTrain, refreshDataset, t],
+  );
+
+  const onReclassify = useCallback(
+    (image: string, newCategory: string) => {
+      axios
+        .post(
+          `/classification/${model.name}/dataset/${pageToggle}/reclassify`,
+          {
+            id: image,
+            new_category: newCategory,
+          },
+        )
+        .then((resp) => {
+          if (resp.status == 200) {
+            toast.success(t("toast.success.reclassifiedImage"), {
+              position: "top-center",
+            });
+            refreshDataset();
+          }
+        })
+        .catch((error) => {
+          const errorMessage =
+            error.response?.data?.message ||
+            error.response?.data?.detail ||
+            "Unknown error";
+          toast.error(t("toast.error.reclassifyFailed", { errorMessage }), {
+            position: "top-center",
+          });
+        });
+    },
+    [pageToggle, model, refreshDataset, t],
   );
 
   // keyboard
@@ -563,6 +627,9 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
           </div>
         )}
       </div>
+      {Object.keys(dataset || {}).length > 0 && (
+        <ClassBalanceStrip categories={dataset} />
+      )}
       {pageToggle == "train" ? (
         <TrainGrid
           model={model}
@@ -579,16 +646,26 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
           onDelete={onDelete}
         />
       ) : (
-        <DatasetGrid
-          contentRef={contentRef}
-          modelName={model.name}
-          categoryName={pageToggle}
-          images={dataset?.[pageToggle] || []}
-          imageMetadata={imageMetadata?.[pageToggle]}
-          selectedImages={selectedImages}
-          onClickImages={onClickImages}
-          onDelete={onDelete}
-        />
+        <>
+          <DatasetAnalysisHeader
+            categoryName={pageToggle}
+            imageCount={dataset?.[pageToggle]?.length || 0}
+            analysis={datasetAnalysis}
+          />
+          <DatasetGrid
+            contentRef={contentRef}
+            modelName={model.name}
+            categoryName={pageToggle}
+            classes={Object.keys(dataset || {})}
+            images={dataset?.[pageToggle] || []}
+            imageMetadata={imageMetadata?.[pageToggle]}
+            analysisByFilename={datasetAnalysisByFilename}
+            selectedImages={selectedImages}
+            onClickImages={onClickImages}
+            onDelete={onDelete}
+            onReclassify={onReclassify}
+          />
+        </>
       )}
     </div>
   );
@@ -617,7 +694,9 @@ function LibrarySelector({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [renameClass, setRenameClass] = useState<string | null>(null);
   const pageTitle = useMemo(() => {
-    if (pageToggle != "train") {
+    if (pageToggle == "none") {
+      return t("details.none");
+    } else if (pageToggle != "train") {
       return pageToggle;
     }
 
@@ -682,7 +761,6 @@ function LibrarySelector({
                 </Button>
                 <Button
                   variant="destructive"
-                  className="text-white"
                   onClick={() => {
                     if (confirmDelete) {
                       handleDeleteCategory(confirmDelete);
@@ -712,7 +790,7 @@ function LibrarySelector({
         regexErrorMessage={t("description.invalidName")}
       />
 
-      <DropdownMenu modal={false}>
+      <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button className="flex justify-between smart-capitalize">
             {pageTitle}
@@ -825,27 +903,108 @@ type DatasetGridProps = {
   contentRef: MutableRefObject<HTMLDivElement | null>;
   modelName: string;
   categoryName: string;
+  classes: string[];
   images: string[];
   imageMetadata?: { [filename: string]: ClassificationImageMetadata };
+  analysisByFilename: Map<
+    string,
+    DatasetCategoryAnalysisResponse["images"][number]
+  >;
   selectedImages: string[];
   onClickImages: (images: string[], ctrl: boolean) => void;
   onDelete: (ids: string[]) => void;
+  onReclassify: (image: string, newCategory: string) => void;
 };
 function DatasetGrid({
   contentRef,
   modelName,
   categoryName,
+  classes,
   images,
   imageMetadata,
+  analysisByFilename,
   selectedImages,
   onClickImages,
   onDelete,
+  onReclassify,
 }: DatasetGridProps) {
   const { t } = useTranslation(["views/classificationModel"]);
 
-  const classData = useMemo(
-    () => images.sort((a, b) => a.localeCompare(b)),
-    [images],
+  const datasetItems = useMemo(
+    () =>
+      [...images]
+        .sort((a, b) => a.localeCompare(b))
+        .map((image) => {
+          const rawMetadata = imageMetadata?.[image];
+          const metadata = metadataFromApi(rawMetadata);
+          return {
+            filename: image,
+            filepath: `clips/${modelName}/dataset/${categoryName}/${image}`,
+            name: metadata?.assignedLabel || categoryName,
+            score: metadata?.confidenceAtAdd,
+            metadata,
+          };
+        }),
+    [images, imageMetadata, modelName, categoryName],
+  );
+
+  const displayEntries = useMemo(
+    () => buildDatasetStackDisplayEntries(datasetItems, analysisByFilename),
+    [datasetItems, analysisByFilename],
+  );
+
+  const handleStackSelect = useCallback(
+    (group: ClassificationItemData[]) => {
+      const selectedInGroup = group
+        .map((item) => item.filename)
+        .filter((filename) => selectedImages.includes(filename));
+
+      if (selectedInGroup.length > 0) {
+        onClickImages(selectedInGroup, false);
+        return;
+      }
+
+      onClickImages(
+        group.map((item) => item.filename),
+        true,
+      );
+    },
+    [onClickImages, selectedImages],
+  );
+
+  const renderDatasetActions = useCallback(
+    (image: string) => (
+      <>
+        <ClassificationSelectionDialog
+          classes={classes}
+          modelName={modelName}
+          image={image}
+          excludeCategory={categoryName}
+          dialogLabel={t("reclassifyImageAs")}
+          tooltipLabel={t("reclassifyImage")}
+          onCategorize={(newCat) => onReclassify(image, newCat)}
+        >
+          <BlurredIconButton>
+            <TbCategoryPlus className="size-5" />
+          </BlurredIconButton>
+        </ClassificationSelectionDialog>
+        <Tooltip>
+          <TooltipTrigger>
+            <LuTrash2
+              className="size-5 cursor-pointer text-gray-200 hover:text-danger"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete([image]);
+              }}
+            />
+          </TooltipTrigger>
+          <TooltipContent>
+            {t("button.deleteClassificationAttempts")}
+          </TooltipContent>
+        </Tooltip>
+      </>
+    ),
+    [categoryName, classes, modelName, onDelete, onReclassify, t],
   );
 
   return (
@@ -853,41 +1012,78 @@ function DatasetGrid({
       ref={contentRef}
       className="scrollbar-container grid grid-cols-2 gap-2 overflow-y-scroll p-1 md:grid-cols-4 xl:grid-cols-8 2xl:grid-cols-10 3xl:grid-cols-12"
     >
-      {classData.map((image) => {
-        const rawMetadata = imageMetadata?.[image];
-        const metadata = metadataFromApi(rawMetadata);
+      {displayEntries.map((entry) => {
+        if (entry.kind === "single") {
+          const analysis = analysisByFilename.get(entry.item.filename);
+          return (
+            <div key={entry.item.filename} className="relative aspect-square w-full">
+              <DatasetAnalysisBadge
+                categoryName={categoryName}
+                analysis={analysis}
+              />
+              <ClassificationCard
+                data={entry.item}
+                showArea={false}
+                clickable={selectedImages.length > 0}
+                selected={selectedImages.includes(entry.item.filename)}
+                i18nLibrary="views/classificationModel"
+                onClick={(data, _) => onClickImages([data.filename], true)}
+              >
+                {renderDatasetActions(entry.item.filename)}
+              </ClassificationCard>
+            </div>
+          );
+        }
+
+        const representative = pickDatasetStackRepresentative(
+          entry.items,
+          analysisByFilename,
+        );
+        const mislabelAnalysis = groupHasDatasetMislabel(
+          entry.items,
+          analysisByFilename,
+        )
+          ? getDatasetMislabelAnalysis(entry.items, analysisByFilename)
+          : undefined;
+
         return (
-        <div key={image} className="aspect-square w-full">
-          <ClassificationCard
-            data={{
-              filename: image,
-              filepath: `clips/${modelName}/dataset/${categoryName}/${image}`,
-              name: metadata?.assignedLabel || categoryName,
-              score: metadata?.confidenceAtAdd,
-              metadata,
-            }}
-            showArea={false}
-            clickable={selectedImages.length > 0}
-            selected={selectedImages.includes(image)}
-            i18nLibrary="views/classificationModel"
-            onClick={(data, _) => onClickImages([data.filename], true)}
-          >
-            <Tooltip>
-              <TooltipTrigger>
-                <LuTrash2
-                  className="size-5 cursor-pointer text-primary-variant hover:text-danger"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete([image]);
-                  }}
-                />
-              </TooltipTrigger>
-              <TooltipContent>
-                {t("button.deleteClassificationAttempts")}
-              </TooltipContent>
-            </Tooltip>
-          </ClassificationCard>
-        </div>
+          <div key={entry.stackId} className="aspect-square w-full">
+            <GroupedClassificationCard
+              group={entry.items}
+              representative={representative}
+              selectedItems={selectedImages}
+              i18nLibrary="views/classificationModel"
+              collapsedTopOverlay={
+                mislabelAnalysis ? (
+                  <DatasetAnalysisBadge
+                    categoryName={categoryName}
+                    analysis={mislabelAnalysis}
+                  />
+                ) : undefined
+              }
+              renderOverlayBadge={(data) => {
+                const analysis = analysisByFilename.get(data.filename);
+                if (!analysis?.mislabel_hint) {
+                  return null;
+                }
+                return (
+                  <DatasetAnalysisBadge
+                    categoryName={categoryName}
+                    analysis={analysis}
+                  />
+                );
+              }}
+              onClick={(data) => {
+                if (data) {
+                  onClickImages([data.filename], true);
+                  return;
+                }
+                handleStackSelect(entry.items);
+              }}
+            >
+              {(data) => renderDatasetActions(data.filename)}
+            </GroupedClassificationCard>
+          </div>
         );
       })}
     </div>
@@ -1057,9 +1253,28 @@ function StateTrainGrid({
     };
   }, [model]);
 
-  const duplicateGroupOutlines = useMemo(
-    () => buildRecentDuplicateGroupOutlineMap(trainData ?? []),
+  const displayEntries = useMemo(
+    () => buildRecentStackDisplayEntries(trainData ?? []),
     [trainData],
+  );
+
+  const handleStackSelect = useCallback(
+    (group: ClassificationItemData[]) => {
+      const selectedInGroup = group
+        .map((item) => item.filename)
+        .filter((filename) => selectedImages.includes(filename));
+
+      if (selectedInGroup.length > 0) {
+        onClickImages(selectedInGroup, false);
+        return;
+      }
+
+      onClickImages(
+        group.map((item) => item.filename),
+        true,
+      );
+    },
+    [onClickImages, selectedImages],
   );
 
   return (
@@ -1072,46 +1287,102 @@ function StateTrainGrid({
       <div
         ref={contentRef}
         className={cn(
-          "scrollbar-container grid grid-cols-2 gap-3 overflow-y-scroll p-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 3xl:grid-cols-12",
+          "scrollbar-container overflow-y-scroll p-1",
+          CLASSIFICATION_GRID_CLASS,
         )}
       >
-        {trainData?.map((data) => (
-          <div key={data.filename} className="aspect-square w-full">
-            <ClassificationCard
-              data={data}
-              threshold={threshold}
-              selected={selectedImages.includes(data.filename)}
-              clickable={true}
-              i18nLibrary="views/classificationModel"
-              showArea={false}
-              showInteractionHint={selectedImages.length === 0}
-              focusMode={focusMode}
-              duplicateGroupOutline={getTileDecorationOutline(
-                data.similarity,
-                duplicateGroupOutlines,
-              )}
-              onClick={(data, meta) => {
-                if (selectedImages.length === 0 && !meta) {
-                  setPreviewItem(data);
-                  return;
-                }
+        {displayEntries.map((entry) => {
+          if (entry.kind === "single") {
+            const data = entry.item;
+            return (
+              <div key={data.filename} className="aspect-square w-full">
+                <ClassificationCard
+                  data={data}
+                  threshold={threshold}
+                  selected={selectedImages.includes(data.filename)}
+                  clickable={true}
+                  i18nLibrary="views/classificationModel"
+                  showArea={false}
+                  showInteractionHint={selectedImages.length === 0}
+                  focusMode={focusMode}
+                  onClick={(data, meta) => {
+                    if (selectedImages.length === 0 && !meta) {
+                      setPreviewItem(data);
+                      return;
+                    }
 
-                onClickImages([data.filename], meta);
-              }}
-            >
-              <ClassificationSelectionDialog
-                classes={classes}
-                modelName={model.name}
-                image={data.filename}
-                onRefresh={onRefresh}
+                    onClickImages([data.filename], meta);
+                  }}
+                >
+                  <ClassificationSelectionDialog
+                    classes={classes}
+                    modelName={model.name}
+                    image={data.filename}
+                    onRefresh={onRefresh}
+                  >
+                    <BlurredIconButton>
+                      <TbCategoryPlus className="size-5" />
+                    </BlurredIconButton>
+                  </ClassificationSelectionDialog>
+                </ClassificationCard>
+              </div>
+            );
+          }
+
+          const representative = pickRecentStackRepresentative(entry.items);
+          const labelCounts = summarizeStackLabelCounts(entry.items);
+
+          return (
+            <div key={entry.stackId} className="aspect-square w-full">
+              <GroupedClassificationCard
+                group={entry.items}
+                representative={representative}
+                selectedItems={selectedImages}
+                i18nLibrary="views/classificationModel"
+                collapsedShowCuration={false}
+                collapsedShowScore={false}
+                collapsedShowFooter={false}
+                stackDescription={t("stack.description", {
+                  count: entry.items.length,
+                  summary: formatStackLabelSummary(labelCounts),
+                })}
+                overlayFocusMode={focusMode}
+                shouldShowOverlayBadge={(data) =>
+                  shouldShowCurationBadgeInStackOverlay(data.similarity)
+                }
+                renderOverlayBadge={(data) => (
+                  <ClassificationCurationBadge
+                    predictedLabel={data.name}
+                    confidence={data.score}
+                    similarity={data.similarity}
+                    focusMode={focusMode}
+                    hideRepeatBadge
+                  />
+                )}
+                onClick={(data) => {
+                  if (data) {
+                    onClickImages([data.filename], true);
+                    return;
+                  }
+                  handleStackSelect(entry.items);
+                }}
               >
-                <BlurredIconButton>
-                  <TbCategoryPlus className="size-5" />
-                </BlurredIconButton>
-              </ClassificationSelectionDialog>
-            </ClassificationCard>
-          </div>
-        ))}
+                {(data) => (
+                  <ClassificationSelectionDialog
+                    classes={classes}
+                    modelName={model.name}
+                    image={data.filename}
+                    onRefresh={onRefresh}
+                  >
+                    <BlurredIconButton>
+                      <TbCategoryPlus className="size-5" />
+                    </BlurredIconButton>
+                  </ClassificationSelectionDialog>
+                )}
+              </GroupedClassificationCard>
+            </div>
+          );
+        })}
       </div>
       )}
       <Dialog
@@ -1295,7 +1566,8 @@ function ObjectTrainGrid({
       <div
         ref={contentRef}
         className={cn(
-          "scrollbar-container grid grid-cols-2 gap-3 overflow-y-scroll p-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 3xl:grid-cols-12",
+          "scrollbar-container overflow-y-scroll p-1",
+          CLASSIFICATION_GRID_CLASS,
         )}
       >
         {Object.entries(groups).map(([key, group]) => {

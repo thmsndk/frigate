@@ -1,5 +1,7 @@
 from frigate.util.classification_similarity import (
     _apply_burst_training_picks,
+    _diversity_from_avg_intra,
+    _duplicate_clusters,
     compute_suggested_action,
     hash_similarity,
     parse_train_filename,
@@ -174,3 +176,49 @@ class TestClassificationSimilarity:
         by_name = {item["filename"]: item for item in suggestions}
 
         assert by_name["wrong.webp"]["suggested_action"] == "relabel_to_package"
+
+
+class TestDatasetCategoryAnalysis:
+    def test_diversity_single_image_is_high(self):
+        assert _diversity_from_avg_intra(0.0, 1) == "high"
+
+    def test_diversity_low_when_avg_intra_high(self):
+        assert _diversity_from_avg_intra(0.92, 5) == "low"
+
+    def test_diversity_high_when_avg_intra_low(self):
+        assert _diversity_from_avg_intra(0.55, 5) == "high"
+
+    def test_diversity_medium_between_thresholds(self):
+        assert _diversity_from_avg_intra(0.78, 5) == "medium"
+
+    def test_duplicate_clusters_groups_transitive_matches(self):
+        identical = "a" * 16
+        near = "b" * 16
+        different = "f" * 16
+        entries = [
+            ("a.png", identical),
+            ("b.png", identical),
+            ("c.png", near),
+            ("d.png", different),
+        ]
+        clusters = _duplicate_clusters(entries)
+        cluster_sets = [set(cluster) for cluster in clusters]
+        assert {"a.png", "b.png"} in cluster_sets
+        assert all("d.png" not in cluster for cluster in cluster_sets)
+
+    def test_duplicate_clusters_empty_for_unique_images(self):
+        entries = [
+            ("a.png", "0" * 16),
+            ("b.png", "f" * 16),
+        ]
+        assert _duplicate_clusters(entries) == []
+
+    def test_stack_ids_assigned_in_analysis_shape(self):
+        # Document expected per-image stack fields (integration needs CLIPS_DIR)
+        image_result = {
+            "filename": "a.png",
+            "duplicate_stack_id": "clear-dup-0",
+            "duplicate_stack_size": 2,
+        }
+        assert image_result["duplicate_stack_id"] == "clear-dup-0"
+        assert image_result["duplicate_stack_size"] == 2

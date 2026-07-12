@@ -580,6 +580,162 @@ def _apply_burst_training_picks(suggestions: list[dict[str, Any]]) -> None:
             suggestion["training_pick_reason"] = ",".join(reasons)
 
 
+def _diversity_from_avg_intra(avg_intra: float, image_count: int) -> str:
+    """Map average intra-class similarity to a diversity label."""
+    if image_count <= 1:
+        return "high"
+    if avg_intra >= 0.85:
+        return "low"
+    if avg_intra < NEW_SCENARIO_THRESHOLD:
+        return "high"
+    return "medium"
+
+
+def _duplicate_clusters(
+    entries: list[tuple[str, str]],
+    duplicate_threshold: float = DUPLICATE_THRESHOLD,
+) -> list[list[str]]:
+    """Group filenames into connected duplicate clusters (>= threshold similarity)."""
+    if len(entries) <= 1:
+        return []
+
+    filenames = [filename for filename, _ in entries]
+    hash_by_filename = {filename: image_hash for filename, image_hash in entries}
+
+    # Union-find for transitive duplicate groups
+    parent = {filename: filename for filename in filenames}
+
+    def find(name: str) -> str:
+        while parent[name] != name:
+            parent[name] = parent[parent[name]]
+            name = parent[name]
+        return name
+
+    def union(a: str, b: str) -> None:
+        root_a = find(a)
+        root_b = find(b)
+        if root_a != root_b:
+            parent[root_b] = root_a
+
+    for i, (left_name, left_hash) in enumerate(entries):
+        for right_name, right_hash in entries[i + 1 :]:
+            if hash_similarity(left_hash, right_hash) >= duplicate_threshold:
+                union(left_name, right_name)
+
+    clusters: dict[str, list[str]] = {}
+    for filename in filenames:
+        root = find(filename)
+        clusters.setdefault(root, []).append(filename)
+
+    return [sorted(cluster) for cluster in clusters.values() if len(cluster) > 1]
+
+
+def compute_dataset_category_analysis(
+    model_name: str, category: str
+) -> dict[str, Any]:
+    """Analyze intra/inter similarity for images in one dataset class."""
+    index = load_similarity_index(model_name)
+    if not index.get("images"):
+        rebuild_similarity_index(model_name)
+        index = load_similarity_index(model_name)
+
+    dataset_by_class = _dataset_entries_by_class(model_name, index)
+    category_entries = dataset_by_class.get(category, [])
+    other_entries = [
+        entry
+        for cls, entries in dataset_by_class.items()
+        if cls != category
+        for entry in entries
+    ]
+
+    hash_entries = [
+        (filename, image_hash)
+        for _, filename, image_hash in category_entries
+        if image_hash
+    ]
+
+    image_results: list[dict[str, Any]] = []
+    max_intra_values: list[float] = []
+
+    for rel_path, filename, image_hash in category_entries:
+        if not image_hash:
+            continue
+
+        intra_matches = [
+            (other_filename, hash_similarity(image_hash, other_hash))
+            for other_rel, other_filename, other_hash in category_entries
+            if other_filename != filename and other_hash
+        ]
+
+        max_intra = 0.0
+        best_intra_filename: str | None = None
+        intra_duplicate_count = 0
+
+        for other_filename, similarity in intra_matches:
+            if similarity > max_intra:
+                max_intra = similarity
+                best_intra_filename = other_filename
+            if similarity >= DUPLICATE_THRESHOLD:
+                intra_duplicate_count += 1
+
+        max_intra_values.append(max_intra)
+
+        max_inter, best_inter_class, best_inter_filename = _best_match_for_hash(
+            image_hash, other_entries
+        )
+
+        mislabel_hint = (
+            max_inter >= MISLABEL_THRESHOLD
+            and max_inter > max_intra
+            and best_inter_class is not None
+        )
+
+        image_results.append(
+            {
+                "filename": filename,
+                "max_intra_similarity": round(max_intra, 4),
+                "intra_duplicate_count": intra_duplicate_count,
+                "best_intra_match_filename": best_intra_filename,
+                "max_inter_similarity": round(max_inter, 4),
+                "best_inter_match_class": best_inter_class,
+                "best_inter_match_filename": best_inter_filename,
+                "mislabel_hint": mislabel_hint,
+            }
+        )
+
+    image_count = len(image_results)
+    avg_intra = (
+        sum(max_intra_values) / len(max_intra_values) if max_intra_values else 0.0
+    )
+
+    duplicate_clusters = _duplicate_clusters(hash_entries)
+    duplicate_image_count = sum(len(cluster) for cluster in duplicate_clusters)
+    suggested_remove_count = sum(len(cluster) - 1 for cluster in duplicate_clusters)
+
+    stack_id_by_filename: dict[str, str] = {}
+    stack_size_by_filename: dict[str, int] = {}
+    for index, cluster in enumerate(duplicate_clusters):
+        stack_id = f"{category}-dup-{index}"
+        for filename in cluster:
+            stack_id_by_filename[filename] = stack_id
+            stack_size_by_filename[filename] = len(cluster)
+
+    for result in image_results:
+        filename = result["filename"]
+        result["duplicate_stack_id"] = stack_id_by_filename.get(filename)
+        result["duplicate_stack_size"] = stack_size_by_filename.get(filename, 1)
+
+    return {
+        "category": category,
+        "image_count": image_count,
+        "diversity": _diversity_from_avg_intra(avg_intra, image_count),
+        "avg_intra_similarity": round(avg_intra, 4),
+        "duplicate_image_count": duplicate_image_count,
+        "suggested_remove_count": suggested_remove_count,
+        "images": sorted(image_results, key=lambda item: item["filename"]),
+    }
+
+
 def build_categorize_metadata(
     training_file_name: str,
     assigned_label: str,

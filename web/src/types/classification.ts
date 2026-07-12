@@ -136,3 +136,26 @@ export type ClassificationDatasetResponse = {
 export type TrainSuggestionsResponse = {
   suggestions: TrainSuggestion[];
 };
+
+export type DatasetImageAnalysis = {
+  filename: string;
+  max_intra_similarity: number;
+  intra_duplicate_count: number;
+  best_intra_match_filename?: string | null;
+  max_inter_similarity: number;
+  best_inter_match_class?: string | null;
+  best_inter_match_filename?: string | null;
+  mislabel_hint: boolean;
+  duplicate_stack_id?: string;
+  duplicate_stack_size?: number;
+};
+
+export type DatasetCategoryAnalysisResponse = {
+  category: string;
+  image_count: number;
+  diversity: "low" | "medium" | "high";
+  avg_intra_similarity: number;
+  duplicate_image_count: number;
+  suggested_remove_count: number;
+  images: DatasetImageAnalysis[];
+};
