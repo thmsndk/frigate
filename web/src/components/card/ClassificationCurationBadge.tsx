@@ -17,6 +17,7 @@ type ClassificationCurationBadgeProps = {
   predictedLabel?: string;
   confidence?: number;
   similarity?: ClassificationSimilarityInfo;
+  focusMode?: boolean;
   className?: string;
 };
 
@@ -24,13 +25,14 @@ export default function ClassificationCurationBadge({
   predictedLabel,
   confidence,
   similarity,
+  focusMode = false,
   className,
 }: ClassificationCurationBadgeProps) {
   const { t } = useTranslation(["views/classificationModel"]);
 
   const badgeStack = useMemo(
-    () => buildCurationBadgeStack(similarity),
-    [similarity],
+    () => buildCurationBadgeStack(similarity, { focusMode }),
+    [similarity, focusMode],
   );
 
   const baseKind = getPrimaryCurationBadgeKind(similarity);

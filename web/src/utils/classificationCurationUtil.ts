@@ -40,7 +40,7 @@ export type CurationBadgeStackItem = {
   faded?: boolean;
 };
 
-export const CURATION_BADGE_FADE_CLASS = "opacity-55 saturate-[0.85]";
+export const CURATION_BADGE_FADE_CLASS = "opacity-75 saturate-90";
 
 const TRAINING_PICK_SIGNAL_CLASS =
   "border-amber-200 bg-amber-400 text-black shadow-[0_0_0_1px_rgba(0,0,0,0.35)]";
@@ -200,14 +200,50 @@ export function isInRecentBurst(
   return (similarity?.duplicateGroupSize ?? 1) > 1;
 }
 
+export type CurationBadgeStackOptions = {
+  /** Focus mode: hide Repeat when library/signals already explain the tile. */
+  focusMode?: boolean;
+};
+
+export function isFocusReviewTile(item: ClassificationItemData): boolean {
+  const priority = getFocusTilePriority(item.similarity);
+  if (priority <= 3) {
+    return true;
+  }
+  if (priority === 6) {
+    return true;
+  }
+  return false;
+}
+
+export function applyFocusModeDisplay(
+  items: ClassificationItemData[],
+): ClassificationItemData[] {
+  return items.filter(isFocusReviewTile);
+}
+
 export function shouldShowRepeatBadge(
   similarity?: ClassificationSimilarityInfo,
+  options?: CurationBadgeStackOptions,
 ): boolean {
   if (!isInRecentBurst(similarity)) {
     return false;
   }
 
-  return similarity?.suggestedAction !== "skip_duplicate_recent";
+  if (similarity?.suggestedAction === "skip_duplicate_recent") {
+    return false;
+  }
+
+  if (options?.focusMode) {
+    if (isInLibraryAction(similarity?.suggestedAction)) {
+      return false;
+    }
+    if (similarity?.trainingPick) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function getPrimaryCurationBadgeKind(
@@ -331,6 +367,32 @@ export function sortRecentItems(
   }
 
   return [...items].sort(compareRecentItemsForFocusSort);
+}
+
+export type RecentFocusStats = {
+  visible: number;
+  total: number;
+};
+
+export type RecentDisplayResult = {
+  items: ClassificationItemData[];
+  focusStats: RecentFocusStats | null;
+};
+
+export function prepareRecentDisplayItems(
+  items: ClassificationItemData[],
+  mode: RecentSortMode,
+): RecentDisplayResult {
+  const sorted = sortRecentItems(items, mode);
+  if (mode !== "focus") {
+    return { items: sorted, focusStats: null };
+  }
+
+  const visible = applyFocusModeDisplay(sorted);
+  return {
+    items: visible,
+    focusStats: { visible: visible.length, total: sorted.length },
+  };
 }
 
 export const RECENT_DUPLICATE_GROUP_OUTLINES = [
@@ -636,14 +698,21 @@ export function getCurationTooltipKey(
 
 export function buildCurationBadgeStack(
   similarity?: ClassificationSimilarityInfo,
+  options?: CurationBadgeStackOptions,
 ): CurationBadgeStackItem[] {
   const items: CurationBadgeStackItem[] = [];
   const suggestedAction = similarity?.suggestedAction;
   const inLibrary = isInLibraryAction(suggestedAction);
   const isMislabel = suggestedAction?.startsWith("relabel_to_") ?? false;
   const primaryPresentation = getCurationBadgePresentation(suggestedAction);
+  const focusMode = options?.focusMode ?? false;
+  const fadeSecondary = inLibrary && !focusMode;
 
   if (isMislabel && primaryPresentation) {
+    items.push({ ...primaryPresentation, faded: false });
+  }
+
+  if (inLibrary && primaryPresentation) {
     items.push({ ...primaryPresentation, faded: false });
   }
 
@@ -653,24 +722,24 @@ export function buildCurationBadgeStack(
     );
     if (signalBadges.length > 0) {
       signalBadges.forEach((badge) => {
-        items.push({ ...badge, faded: inLibrary });
+        items.push({ ...badge, faded: fadeSecondary });
       });
     } else {
       const fallback = getCurationBadgePresentation("training_pick");
       if (fallback) {
-        items.push({ ...fallback, faded: inLibrary });
+        items.push({ ...fallback, faded: fadeSecondary });
       }
     }
   }
 
-  if (!isMislabel && primaryPresentation) {
+  if (!isMislabel && !inLibrary && primaryPresentation) {
     items.push({ ...primaryPresentation, faded: false });
   }
 
-  if (shouldShowRepeatBadge(similarity)) {
+  if (shouldShowRepeatBadge(similarity, options)) {
     const repeatBadge = getCurationBadgePresentation("skip_duplicate_recent");
     if (repeatBadge) {
-      items.push({ ...repeatBadge, faded: inLibrary });
+      items.push({ ...repeatBadge, faded: fadeSecondary && !isMislabel });
     }
   }
 

@@ -77,8 +77,9 @@ import {
   buildRecentDuplicateGroupOutlineMap,
   getCurationTooltipKey,
   getTileDecorationOutline,
-  sortRecentItems,
+  prepareRecentDisplayItems,
   DEFAULT_RECENT_SORT_MODE,
+  RecentFocusStats,
 } from "@/utils/classificationCurationUtil";
 import { baseUrl } from "@/api/baseUrl";
 import {
@@ -172,6 +173,8 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
   const [trainFilter, setTrainFilter] = useApiFilter<TrainFilter>();
   const [recentSortMode, setRecentSortMode] =
     useState<RecentSortMode>(DEFAULT_RECENT_SORT_MODE);
+  const [focusDisplayStats, setFocusDisplayStats] =
+    useState<RecentFocusStats | null>(null);
 
   const refreshAll = useCallback(() => {
     refreshTrain();
@@ -502,7 +505,13 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
           <div className="flex flex-row gap-2">
             <RecentSortToggle
               sortMode={recentSortMode}
-              onSortModeChange={setRecentSortMode}
+              focusStats={focusDisplayStats}
+              onSortModeChange={(mode) => {
+                setRecentSortMode(mode);
+                if (mode !== "focus") {
+                  setFocusDisplayStats(null);
+                }
+              }}
             />
             <TrainFilterDialog
               filter={trainFilter}
@@ -562,6 +571,7 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
           trainImages={trainImages || []}
           trainFilter={trainFilter}
           sortMode={recentSortMode}
+          onFocusDisplayStatsChange={setFocusDisplayStats}
           suggestionsByFilename={suggestionsByFilename}
           selectedImages={selectedImages}
           onRefresh={refreshAll}
@@ -891,6 +901,7 @@ type TrainGridProps = {
   trainImages: string[];
   trainFilter?: TrainFilter;
   sortMode: RecentSortMode;
+  onFocusDisplayStatsChange?: (stats: RecentFocusStats | null) => void;
   suggestionsByFilename: Map<
     string,
     TrainSuggestionsResponse["suggestions"][number]
@@ -907,13 +918,14 @@ function TrainGrid({
   trainImages,
   trainFilter,
   sortMode,
+  onFocusDisplayStatsChange,
   suggestionsByFilename,
   selectedImages,
   onClickImages,
   onRefresh,
   onDelete,
 }: TrainGridProps) {
-  const trainData = useMemo<ClassificationItemData[]>(() => {
+  const { trainData, focusMode, focusStats } = useMemo(() => {
     const filtered = trainImages
       .map((raw) => {
         const parts = raw.replaceAll(".webp", "").split("-");
@@ -961,8 +973,24 @@ function TrainGrid({
         return true;
       });
 
-    return sortRecentItems(filtered, sortMode);
-  }, [model, trainImages, trainFilter, sortMode, suggestionsByFilename]);
+    const { items, focusStats } = prepareRecentDisplayItems(filtered, sortMode);
+
+    return {
+      trainData: items,
+      focusMode: sortMode === "focus",
+      focusStats,
+    };
+  }, [
+    model,
+    trainImages,
+    trainFilter,
+    sortMode,
+    suggestionsByFilename,
+  ]);
+
+  useEffect(() => {
+    onFocusDisplayStatsChange?.(focusStats);
+  }, [focusStats, onFocusDisplayStatsChange]);
 
   if (model.state_config) {
     return (
@@ -971,6 +999,8 @@ function TrainGrid({
         contentRef={contentRef}
         classes={classes}
         trainData={trainData}
+        focusMode={focusMode}
+        focusTotal={focusStats?.total}
         selectedImages={selectedImages}
         onClickImages={onClickImages}
         onRefresh={onRefresh}
@@ -997,6 +1027,8 @@ type StateTrainGridProps = {
   contentRef: MutableRefObject<HTMLDivElement | null>;
   classes: string[];
   trainData?: ClassificationItemData[];
+  focusMode?: boolean;
+  focusTotal?: number;
   selectedImages: string[];
   onClickImages: (images: string[], ctrl: boolean) => void;
   onRefresh: () => void;
@@ -1007,6 +1039,8 @@ function StateTrainGrid({
   contentRef,
   classes,
   trainData,
+  focusMode = false,
+  focusTotal,
   selectedImages,
   onClickImages,
   onRefresh,
@@ -1030,6 +1064,11 @@ function StateTrainGrid({
 
   return (
     <>
+      {focusMode && (trainData?.length ?? 0) === 0 ? (
+        <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
+          {t("sort.focusEmpty", { total: focusTotal ?? 0 })}
+        </div>
+      ) : (
       <div
         ref={contentRef}
         className={cn(
@@ -1046,6 +1085,7 @@ function StateTrainGrid({
               i18nLibrary="views/classificationModel"
               showArea={false}
               showInteractionHint={selectedImages.length === 0}
+              focusMode={focusMode}
               duplicateGroupOutline={getTileDecorationOutline(
                 data.similarity,
                 duplicateGroupOutlines,
@@ -1073,6 +1113,7 @@ function StateTrainGrid({
           </div>
         ))}
       </div>
+      )}
       <Dialog
         open={previewItem != null}
         onOpenChange={(open) => {

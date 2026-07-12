@@ -47,6 +47,7 @@ type ClassificationCardProps = {
   count?: number;
   duplicateGroupOutline?: string;
   showInteractionHint?: boolean;
+  focusMode?: boolean;
   onClick: (data: ClassificationItemData, meta: boolean) => void;
   children?: React.ReactNode;
 };
@@ -66,6 +67,7 @@ export const ClassificationCard = forwardRef<
     count,
     duplicateGroupOutline,
     showInteractionHint = false,
+    focusMode = false,
     onClick,
     children,
   },
@@ -197,6 +199,7 @@ export const ClassificationCard = forwardRef<
           predictedLabel={data.name}
           confidence={data.score}
           similarity={data.similarity}
+          focusMode={focusMode}
         />
       )}
       {count && (
