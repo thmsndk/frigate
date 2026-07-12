@@ -252,10 +252,6 @@ def compute_suggested_action(
     max_other_class_similarity: float,
     best_other_class: str | None,
 ) -> str:
-    if max_same_dataset_similarity >= DUPLICATE_THRESHOLD:
-        return "skip_duplicate_library"
-    if max_same_recent_similarity >= DUPLICATE_THRESHOLD:
-        return "skip_duplicate_recent"
     max_same_class_similarity = max(
         max_same_dataset_similarity, max_same_recent_similarity
     )
@@ -265,6 +261,10 @@ def compute_suggested_action(
         and best_other_class
     ):
         return f"relabel_to_{best_other_class}"
+    if max_same_dataset_similarity >= DUPLICATE_THRESHOLD:
+        return "skip_duplicate_library"
+    if max_same_recent_similarity >= DUPLICATE_THRESHOLD:
+        return "skip_duplicate_recent"
     if (
         max(max_same_class_similarity, max_other_class_similarity)
         < NEW_SCENARIO_THRESHOLD
@@ -560,7 +560,10 @@ def _apply_burst_training_picks(suggestions: list[dict[str, Any]]) -> None:
             suggestion["burst_hard_positive_pool_size"] = hard_positive_pool_size
             suggestion["burst_diversity_pool_size"] = diversity_pool_size
 
-            if suggestion["suggested_action"] != "skip_duplicate_library":
+            if (
+                suggestion["suggested_action"] != "skip_duplicate_library"
+                and not suggestion["suggested_action"].startswith("relabel_to_")
+            ):
                 suggestion["suggested_action"] = "skip_duplicate_recent"
 
             if filename not in pick_filenames:

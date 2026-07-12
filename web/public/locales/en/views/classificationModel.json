@@ -100,6 +100,11 @@
     "addedConfidence": "Added · was {{score}}%",
     "relabeled": "Was {{from}} {{fromScore}}% → {{to}}"
   },
+  "sort": {
+    "focus": "Focus",
+    "focusAria": "Focus sort — prioritize mislabels and interesting burst frames",
+    "focusTooltip": "Off: newest first. On: every tile ranked by badge urgency — both signals first, then Lower conf, then Most different, then plain repeats. Nothing hidden."
+  },
   "curation": {
     "interactionHint": "Click to preview · Right-click to select",
     "interactionHintMobile": "Tap to preview · Long-press to select",

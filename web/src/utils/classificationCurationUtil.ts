@@ -4,6 +4,7 @@ import {
   ClassificationItemMetadata,
   ClassificationItemData,
   ClassificationSimilarityInfo,
+  RecentSortMode,
   SimilarityPreset,
   TrainFilter,
   TrainSuggestion,
@@ -36,7 +37,10 @@ export type CurationBadgeStackItem = {
   relabelTarget?: string;
   className: string;
   Icon: IconType;
+  faded?: boolean;
 };
+
+export const CURATION_BADGE_FADE_CLASS = "opacity-55 saturate-[0.85]";
 
 const TRAINING_PICK_SIGNAL_CLASS =
   "border-amber-200 bg-amber-400 text-black shadow-[0_0_0_1px_rgba(0,0,0,0.35)]";
@@ -183,6 +187,152 @@ export function getCurationBadgePresentation(
 
 export const CURATION_DUPLICATE_THRESHOLD = 90;
 
+export function isInLibraryAction(suggestedAction?: string): boolean {
+  return (
+    suggestedAction === "skip_duplicate_library" ||
+    suggestedAction === "skip_duplicate"
+  );
+}
+
+export function isInRecentBurst(
+  similarity?: ClassificationSimilarityInfo,
+): boolean {
+  return (similarity?.duplicateGroupSize ?? 1) > 1;
+}
+
+export function shouldShowRepeatBadge(
+  similarity?: ClassificationSimilarityInfo,
+): boolean {
+  if (!isInRecentBurst(similarity)) {
+    return false;
+  }
+
+  return similarity?.suggestedAction !== "skip_duplicate_recent";
+}
+
+export function getPrimaryCurationBadgeKind(
+  similarity?: ClassificationSimilarityInfo,
+): CurationBadgeKind | undefined {
+  return getCurationBadgeKind(similarity?.suggestedAction);
+}
+
+export const DEFAULT_RECENT_SORT_MODE: RecentSortMode = "newest";
+
+/**
+ * Per-tile urgency for focus sort (lower = higher in grid).
+ * Both signals beat either alone; Lower conf before Most different (uncertainty
+ * before diversity — revisit if homelab usage suggests otherwise).
+ */
+export function getFocusTilePriority(
+  similarity?: ClassificationSimilarityInfo,
+): number {
+  const action = similarity?.suggestedAction;
+  if (action?.startsWith("relabel_to_")) {
+    return 0;
+  }
+
+  const reasons = similarity?.trainingPickReasons ?? [];
+  const hasHard = reasons.includes("hard_positive_in_burst");
+  const hasDiverse = reasons.includes("most_diverse_in_burst");
+
+  if (hasHard && hasDiverse) {
+    return 1;
+  }
+  if (hasHard) {
+    return 2;
+  }
+  if (hasDiverse) {
+    return 3;
+  }
+  if (isInLibraryAction(action)) {
+    return 5;
+  }
+  if (isInRecentBurst(similarity)) {
+    return 4;
+  }
+  if (
+    action === "candidate" ||
+    action === "add" ||
+    action === "review" ||
+    action === "add_new_scenario"
+  ) {
+    return 6;
+  }
+
+  return 7;
+}
+
+function getFocusUngroupedTier(
+  similarity?: ClassificationSimilarityInfo,
+): number {
+  const action = similarity?.suggestedAction;
+  if (
+    action === "candidate" ||
+    action === "add" ||
+    action === "review" ||
+    action === "add_new_scenario"
+  ) {
+    return 0;
+  }
+  if (isInLibraryAction(action)) {
+    return 2;
+  }
+
+  return 1;
+}
+
+function getFocusSortKey(item: ClassificationItemData): [number, number, number, string] {
+  const timestamp = item.timestamp ?? 0;
+  const similarity = item.similarity;
+  const inBurst = isInRecentBurst(similarity);
+  const isMislabel = similarity?.suggestedAction?.startsWith("relabel_to_") ?? false;
+
+  if (!inBurst && isMislabel) {
+    return [0, 0, -timestamp, ""];
+  }
+
+  if (inBurst || isMislabel) {
+    return [
+      1,
+      getFocusTilePriority(similarity),
+      -timestamp,
+      similarity?.duplicateGroup ?? item.filename,
+    ];
+  }
+
+  return [2, getFocusUngroupedTier(similarity), -timestamp, ""];
+}
+
+export function compareRecentItemsForFocusSort(
+  a: ClassificationItemData,
+  b: ClassificationItemData,
+): number {
+  const keyA = getFocusSortKey(a);
+  const keyB = getFocusSortKey(b);
+
+  for (let index = 0; index < keyA.length; index++) {
+    if (keyA[index] < keyB[index]) {
+      return -1;
+    }
+    if (keyA[index] > keyB[index]) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+export function sortRecentItems(
+  items: ClassificationItemData[],
+  mode: RecentSortMode = DEFAULT_RECENT_SORT_MODE,
+): ClassificationItemData[] {
+  if (mode === "newest") {
+    return [...items].sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+  }
+
+  return [...items].sort(compareRecentItemsForFocusSort);
+}
+
 export const RECENT_DUPLICATE_GROUP_OUTLINES = [
   "outline-cyan-400/90",
   "outline-violet-400/90",
@@ -311,7 +461,8 @@ export function getSimilaritySubtitleKey(
 export const CURATION_FILTER_PRESETS: SimilarityPreset[] = [
   "duplicate_recent",
   "duplicate_library",
-  "training_pick",
+  "hard_positive_in_burst",
+  "most_diverse_in_burst",
   "candidate",
   "mislabel",
   "new_scenario",
@@ -323,8 +474,10 @@ export function suggestedActionForPreset(preset: SimilarityPreset): string {
       return "skip_duplicate_recent";
     case "duplicate_library":
       return "skip_duplicate_library";
-    case "training_pick":
-      return "training_pick";
+    case "hard_positive_in_burst":
+      return "hard_positive_in_burst";
+    case "most_diverse_in_burst":
+      return "most_diverse_in_burst";
     case "candidate":
       return "candidate";
     case "new_scenario":
@@ -332,6 +485,20 @@ export function suggestedActionForPreset(preset: SimilarityPreset): string {
     case "mislabel":
       return "relabel_to_other";
   }
+}
+
+export function getCurationBadgePresentationForPreset(
+  preset: SimilarityPreset,
+): CurationBadgePresentation | undefined {
+  if (
+    preset === "hard_positive_in_burst" ||
+    preset === "most_diverse_in_burst"
+  ) {
+    const signalBadge = getTrainingPickSignalBadges([preset])[0];
+    return signalBadge;
+  }
+
+  return getCurationBadgePresentation(suggestedActionForPreset(preset));
 }
 
 export function matchesSimilarityFilter(
@@ -365,7 +532,17 @@ export function matchesSimilarityFilter(
   if (filter.similarity_preset) {
     switch (filter.similarity_preset) {
       case "duplicate_recent":
-        if (suggestion.suggestedAction !== "skip_duplicate_recent") {
+        if (
+          suggestion.suggestedAction !== "skip_duplicate_recent" &&
+          !(
+            isInRecentBurst(suggestion) &&
+            suggestion.suggestedAction?.startsWith("relabel_to_")
+          ) &&
+          !(
+            isInRecentBurst(suggestion) &&
+            isInLibraryAction(suggestion.suggestedAction)
+          )
+        ) {
           return false;
         }
         break;
@@ -377,8 +554,17 @@ export function matchesSimilarityFilter(
           return false;
         }
         break;
-      case "training_pick":
-        if (!suggestion.trainingPick) {
+      case "hard_positive_in_burst":
+        if (
+          !suggestion.trainingPickReasons?.includes("hard_positive_in_burst")
+        ) {
+          return false;
+        }
+        break;
+      case "most_diverse_in_burst":
+        if (
+          !suggestion.trainingPickReasons?.includes("most_diverse_in_burst")
+        ) {
           return false;
         }
         break;
@@ -452,22 +638,40 @@ export function buildCurationBadgeStack(
   similarity?: ClassificationSimilarityInfo,
 ): CurationBadgeStackItem[] {
   const items: CurationBadgeStackItem[] = [];
+  const suggestedAction = similarity?.suggestedAction;
+  const inLibrary = isInLibraryAction(suggestedAction);
+  const isMislabel = suggestedAction?.startsWith("relabel_to_") ?? false;
+  const primaryPresentation = getCurationBadgePresentation(suggestedAction);
+
+  if (isMislabel && primaryPresentation) {
+    items.push({ ...primaryPresentation, faded: false });
+  }
 
   if (similarity?.trainingPick) {
-    const signalBadges = getTrainingPickSignalBadges(similarity.trainingPickReasons);
+    const signalBadges = getTrainingPickSignalBadges(
+      similarity.trainingPickReasons,
+    );
     if (signalBadges.length > 0) {
-      items.push(...signalBadges);
+      signalBadges.forEach((badge) => {
+        items.push({ ...badge, faded: inLibrary });
+      });
     } else {
       const fallback = getCurationBadgePresentation("training_pick");
       if (fallback) {
-        items.push(fallback);
+        items.push({ ...fallback, faded: inLibrary });
       }
     }
   }
 
-  const basePresentation = getCurationBadgePresentation(similarity?.suggestedAction);
-  if (basePresentation) {
-    items.push(basePresentation);
+  if (!isMislabel && primaryPresentation) {
+    items.push({ ...primaryPresentation, faded: false });
+  }
+
+  if (shouldShowRepeatBadge(similarity)) {
+    const repeatBadge = getCurationBadgePresentation("skip_duplicate_recent");
+    if (repeatBadge) {
+      items.push({ ...repeatBadge, faded: inLibrary });
+    }
   }
 
   return items;

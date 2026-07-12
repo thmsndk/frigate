@@ -15,8 +15,7 @@ import { useTranslation } from "react-i18next";
 import { TrainFilter, SimilarityPreset } from "@/types/classification";
 import {
   CURATION_FILTER_PRESETS,
-  getCurationBadgePresentation,
-  suggestedActionForPreset,
+  getCurationBadgePresentationForPreset,
 } from "@/utils/classificationCurationUtil";
 
 type TrainFilterDialogProps = {
@@ -306,9 +305,7 @@ export function SimilarityFilterContent({
       </p>
       <div className="mt-2.5 flex flex-col gap-3">
         {CURATION_FILTER_PRESETS.map((item) => {
-          const presentation = getCurationBadgePresentation(
-            suggestedActionForPreset(item),
-          );
+          const presentation = getCurationBadgePresentationForPreset(item);
           if (!presentation) {
             return null;
           }

@@ -4,10 +4,13 @@ export type TrainFilters = (typeof TRAIN_FILTERS)[number];
 export type SimilarityPreset =
   | "duplicate_recent"
   | "duplicate_library"
-  | "training_pick"
+  | "hard_positive_in_burst"
+  | "most_diverse_in_burst"
   | "candidate"
   | "mislabel"
   | "new_scenario";
+
+export type RecentSortMode = "newest" | "focus";
 
 export type TrainFilter = {
   classes?: string[];

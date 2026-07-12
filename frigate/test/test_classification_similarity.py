@@ -40,6 +40,10 @@ class TestClassificationSimilarity:
         action = compute_suggested_action(0.67, 0.4, 0.2, 0.91, "clear")
         assert action == "relabel_to_clear"
 
+    def test_compute_suggested_action_mislabel_beats_library(self):
+        action = compute_suggested_action(0.67, 0.92, 0.2, 0.94, "package")
+        assert action == "relabel_to_package"
+
     def test_compute_suggested_action_new_scenario(self):
         action = compute_suggested_action(0.67, 0.2, 0.2, 0.3, "clear")
         assert action == "add_new_scenario"
@@ -120,3 +124,53 @@ class TestClassificationSimilarity:
         assert by_name["high.webp"]["training_pick"] is True
         assert by_name["high.webp"]["burst_diversity_rank"] == 1
         assert "most_diverse_in_burst" in by_name["high.webp"]["training_pick_reasons"]
+
+    def test_burst_training_pick_on_library_duplicate_in_burst(self):
+        suggestions = [
+            {
+                "filename": "dup.webp",
+                "confidence": 0.70,
+                "timestamp": 1.0,
+                "duplicate_group": "clear-1",
+                "image_hash": "0" * 16,
+                "suggested_action": "skip_duplicate_library",
+            },
+            {
+                "filename": "other.webp",
+                "confidence": 0.95,
+                "timestamp": 2.0,
+                "duplicate_group": "clear-1",
+                "image_hash": "f" * 16,
+                "suggested_action": "skip_duplicate_recent",
+            },
+        ]
+        _apply_burst_training_picks(suggestions)
+        by_name = {item["filename"]: item for item in suggestions}
+
+        assert by_name["dup.webp"]["suggested_action"] == "skip_duplicate_library"
+        assert by_name["dup.webp"]["training_pick"] is True
+        assert "hard_positive_in_burst" in by_name["dup.webp"]["training_pick_reasons"]
+
+    def test_burst_preserves_mislabel(self):
+        suggestions = [
+            {
+                "filename": "wrong.webp",
+                "confidence": 0.67,
+                "timestamp": 1.0,
+                "duplicate_group": "clear-1",
+                "image_hash": "0" * 16,
+                "suggested_action": "relabel_to_package",
+            },
+            {
+                "filename": "peer.webp",
+                "confidence": 0.95,
+                "timestamp": 2.0,
+                "duplicate_group": "clear-1",
+                "image_hash": "f" * 16,
+                "suggested_action": "skip_duplicate_recent",
+            },
+        ]
+        _apply_burst_training_picks(suggestions)
+        by_name = {item["filename"]: item for item in suggestions}
+
+        assert by_name["wrong.webp"]["suggested_action"] == "relabel_to_package"

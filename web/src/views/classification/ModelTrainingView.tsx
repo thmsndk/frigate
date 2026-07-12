@@ -58,12 +58,14 @@ import ActivityIndicator from "@/components/indicators/activity-indicator";
 import { useNavigate } from "react-router-dom";
 import { IoMdArrowRoundBack } from "react-icons/io";
 import TrainFilterDialog from "@/components/overlay/dialog/TrainFilterDialog";
+import RecentSortToggle from "@/components/classification/RecentSortToggle";
 import useApiFilter from "@/hooks/use-api-filter";
 import {
   ClassificationDatasetResponse,
   ClassificationImageMetadata,
   ClassificationItemData,
   ClassifiedEvent,
+  RecentSortMode,
   TrainFilter,
   TrainSuggestionsResponse,
 } from "@/types/classification";
@@ -75,6 +77,8 @@ import {
   buildRecentDuplicateGroupOutlineMap,
   getCurationTooltipKey,
   getTileDecorationOutline,
+  sortRecentItems,
+  DEFAULT_RECENT_SORT_MODE,
 } from "@/utils/classificationCurationUtil";
 import { baseUrl } from "@/api/baseUrl";
 import {
@@ -166,6 +170,8 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
   }, [suggestionsResponse]);
 
   const [trainFilter, setTrainFilter] = useApiFilter<TrainFilter>();
+  const [recentSortMode, setRecentSortMode] =
+    useState<RecentSortMode>(DEFAULT_RECENT_SORT_MODE);
 
   const refreshAll = useCallback(() => {
     refreshTrain();
@@ -494,6 +500,10 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
           </div>
         ) : (
           <div className="flex flex-row gap-2">
+            <RecentSortToggle
+              sortMode={recentSortMode}
+              onSortModeChange={setRecentSortMode}
+            />
             <TrainFilterDialog
               filter={trainFilter}
               filterValues={{ classes: Object.keys(dataset || {}) }}
@@ -551,6 +561,7 @@ export default function ModelTrainingView({ model }: ModelTrainingViewProps) {
           classes={Object.keys(dataset || {})}
           trainImages={trainImages || []}
           trainFilter={trainFilter}
+          sortMode={recentSortMode}
           suggestionsByFilename={suggestionsByFilename}
           selectedImages={selectedImages}
           onRefresh={refreshAll}
@@ -879,6 +890,7 @@ type TrainGridProps = {
   classes: string[];
   trainImages: string[];
   trainFilter?: TrainFilter;
+  sortMode: RecentSortMode;
   suggestionsByFilename: Map<
     string,
     TrainSuggestionsResponse["suggestions"][number]
@@ -894,63 +906,63 @@ function TrainGrid({
   classes,
   trainImages,
   trainFilter,
+  sortMode,
   suggestionsByFilename,
   selectedImages,
   onClickImages,
   onRefresh,
   onDelete,
 }: TrainGridProps) {
-  const trainData = useMemo<ClassificationItemData[]>(
-    () =>
-      trainImages
-        .map((raw) => {
-          const parts = raw.replaceAll(".webp", "").split("-");
-          const rawScore = Number.parseFloat(parts[4]);
-          const suggestion = suggestionsByFilename.get(raw);
-          return {
-            filename: raw,
-            filepath: `clips/${model.name}/train/${raw}`,
-            timestamp: Number.parseFloat(parts[2]),
-            eventId: `${parts[0]}-${parts[1]}`,
-            name: parts[3],
-            score: rawScore,
-            similarity: suggestion
-              ? suggestionToSimilarityInfo(suggestion)
-              : undefined,
-          };
-        })
-        .filter((data) => {
-          // Ignore images that don't match the expected format (event-camera-timestamp-state-score.webp)
-          // Expected format has 5 parts when split by "-", and score should be a valid number
-          if (data.score === undefined || isNaN(data.score) || !data.name) {
-            return false;
-          }
+  const trainData = useMemo<ClassificationItemData[]>(() => {
+    const filtered = trainImages
+      .map((raw) => {
+        const parts = raw.replaceAll(".webp", "").split("-");
+        const rawScore = Number.parseFloat(parts[4]);
+        const suggestion = suggestionsByFilename.get(raw);
+        return {
+          filename: raw,
+          filepath: `clips/${model.name}/train/${raw}`,
+          timestamp: Number.parseFloat(parts[2]),
+          eventId: `${parts[0]}-${parts[1]}`,
+          name: parts[3],
+          score: rawScore,
+          similarity: suggestion
+            ? suggestionToSimilarityInfo(suggestion)
+            : undefined,
+        };
+      })
+      .filter((data) => {
+        // Ignore images that don't match the expected format (event-camera-timestamp-state-score.webp)
+        // Expected format has 5 parts when split by "-", and score should be a valid number
+        if (data.score === undefined || isNaN(data.score) || !data.name) {
+          return false;
+        }
 
-          if (!trainFilter) {
-            return true;
-          }
-
-          if (trainFilter.classes && !trainFilter.classes.includes(data.name)) {
-            return false;
-          }
-
-          if (trainFilter.min_score && trainFilter.min_score > data.score) {
-            return false;
-          }
-
-          if (trainFilter.max_score && trainFilter.max_score < data.score) {
-            return false;
-          }
-
-          if (!matchesSimilarityFilter(data.similarity, trainFilter)) {
-            return false;
-          }
-
+        if (!trainFilter) {
           return true;
-        })
-        .sort((a, b) => b.timestamp - a.timestamp),
-    [model, trainImages, trainFilter, suggestionsByFilename],
-  );
+        }
+
+        if (trainFilter.classes && !trainFilter.classes.includes(data.name)) {
+          return false;
+        }
+
+        if (trainFilter.min_score && trainFilter.min_score > data.score) {
+          return false;
+        }
+
+        if (trainFilter.max_score && trainFilter.max_score < data.score) {
+          return false;
+        }
+
+        if (!matchesSimilarityFilter(data.similarity, trainFilter)) {
+          return false;
+        }
+
+        return true;
+      });
+
+    return sortRecentItems(filtered, sortMode);
+  }, [model, trainImages, trainFilter, sortMode, suggestionsByFilename]);
 
   if (model.state_config) {
     return (

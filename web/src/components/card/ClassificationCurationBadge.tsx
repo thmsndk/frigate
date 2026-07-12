@@ -3,6 +3,8 @@ import { ClassificationSimilarityInfo } from "@/types/classification";
 import {
   buildCurationBadgeStack,
   buildCurationTooltipValues,
+  CURATION_BADGE_FADE_CLASS,
+  getPrimaryCurationBadgeKind,
   getSimilaritySubtitleKey,
   shouldShowSimilaritySubtitle,
 } from "@/utils/classificationCurationUtil";
@@ -31,7 +33,7 @@ export default function ClassificationCurationBadge({
     [similarity],
   );
 
-  const baseKind = badgeStack.at(-1)?.kind;
+  const baseKind = getPrimaryCurationBadgeKind(similarity);
 
   const tooltipValues = useMemo(
     () => buildCurationTooltipValues(similarity, predictedLabel, confidence),
@@ -68,6 +70,7 @@ export default function ClassificationCurationBadge({
                   className={cn(
                     "flex w-fit max-w-full cursor-help items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-tight shadow-sm backdrop-blur-sm",
                     badge.className,
+                    badge.faded && CURATION_BADGE_FADE_CLASS,
                   )}
                 >
                   <Icon className="size-3 shrink-0" />

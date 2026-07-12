@@ -43,6 +43,24 @@
     "all": "All Attributes"
   },
   "score": "Score",
+  "sort": {
+    "recent": {
+      "label": "Sort",
+      "toggle": "Toggle focus sort for Recent classifications",
+      "hint": "Focus brings mislabels and interesting burst frames to the top without hiding the rest.",
+      "modes": {
+        "newest": {
+          "title": "Inbox (newest first)",
+          "short": "Inbox",
+          "desc": "Most recent captures first — good for day-to-day triage. Click to enable Focus sort."
+        },
+        "focus": {
+          "title": "Focus",
+          "desc": "Ungrouped mislabels first, then burst clusters (mislabel → both signals → Lower conf → Most different → repeats). Click to return to Inbox."
+        }
+      }
+    }
+  },
   "similarity": {
     "label": "Curation",
     "hint": "Matches the badge on each tile — compares Recent shots to each other and to your training library.",
@@ -58,8 +76,11 @@
       "duplicate_library": {
         "desc": "Visually similar to training library — usually skip; you can still add if you disagree."
       },
-      "training_pick": {
-        "desc": "Burst candidates flagged by signal: Lower conf (uncertain among repeats) and/or Most different (least like other burst frames)."
+      "hard_positive_in_burst": {
+        "desc": "Lower conf among burst repeats — bottom ~25% model confidence when spread is meaningful; usually review with Repeat."
+      },
+      "most_diverse_in_burst": {
+        "desc": "Most different in burst — least visually like the other repeat frames; often good for diversity."
       },
       "candidate": {
         "desc": "Not a duplicate — worth reviewing; model confidence shown for context only."
