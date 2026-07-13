@@ -25,54 +25,28 @@ import { cn } from "@/lib/utils";
 import React, { ReactNode, useCallback, useMemo, useState } from "react";
 import TextEntryDialog from "./dialog/TextEntryDialog";
 import { Button } from "../ui/button";
-import axios from "axios";
-import { toast } from "sonner";
 import { Separator } from "../ui/separator";
 
-type ClassificationSelectionDialogProps = {
+type ReclassifySelectionDialogProps = {
   className?: string;
   classes: string[];
-  modelName: string;
-  image: string;
-  onRefresh: () => void;
+  currentCategory: string;
+  onReclassify: (newCategory: string) => void;
   children: ReactNode;
 };
-export default function ClassificationSelectionDialog({
+
+export default function ReclassifySelectionDialog({
   className,
   classes,
-  modelName,
-  image,
-  onRefresh,
+  currentCategory,
+  onReclassify,
   children,
-}: ClassificationSelectionDialogProps) {
+}: ReclassifySelectionDialogProps) {
   const { t } = useTranslation(["views/classificationModel"]);
 
-  const onCategorizeImage = useCallback(
-    (category: string) => {
-      axios
-        .post(`/classification/${modelName}/dataset/categorize`, {
-          category,
-          training_file: image,
-        })
-        .then((resp) => {
-          if (resp.status == 200) {
-            toast.success(t("toast.success.categorizedImage"), {
-              position: "top-center",
-            });
-            onRefresh();
-          }
-        })
-        .catch((error) => {
-          const errorMessage =
-            error.response?.data?.message ||
-            error.response?.data?.detail ||
-            "Unknown error";
-          toast.error(t("toast.error.categorizeFailed", { errorMessage }), {
-            position: "top-center",
-          });
-        });
-    },
-    [modelName, image, onRefresh, t],
+  const targetClasses = useMemo(
+    () => classes.filter((category) => category !== currentCategory),
+    [classes, currentCategory],
   );
 
   const isChildButton = useMemo(
@@ -80,10 +54,15 @@ export default function ClassificationSelectionDialog({
     [children],
   );
 
-  // control
   const [newClass, setNewClass] = useState(false);
 
-  // components
+  const onSelectCategory = useCallback(
+    (category: string) => {
+      onReclassify(category);
+    },
+    [onReclassify],
+  );
+
   const Selector = isDesktop ? DropdownMenu : Drawer;
   const SelectorTrigger = isDesktop ? DropdownMenuTrigger : DrawerTrigger;
   const SelectorContent = isDesktop ? DropdownMenuContent : DrawerContent;
@@ -101,7 +80,7 @@ export default function ClassificationSelectionDialog({
         open={newClass}
         setOpen={setNewClass}
         title={t("createCategory.new")}
-        onSave={(newCat) => onCategorizeImage(newCat)}
+        onSave={(newCategory) => onSelectCategory(newCategory)}
       />
 
       <Tooltip>
@@ -118,14 +97,14 @@ export default function ClassificationSelectionDialog({
                 <DrawerDescription>Details</DrawerDescription>
               </DrawerHeader>
             )}
-            <DropdownMenuLabel>{t("categorizeImageAs")}</DropdownMenuLabel>
+            <DropdownMenuLabel>{t("reclassifyImageAs")}</DropdownMenuLabel>
             <div
               className={cn(
                 "flex max-h-[40dvh] flex-col overflow-y-auto",
                 isMobile && "gap-2 pb-4",
               )}
             >
-              {classes
+              {targetClasses
                 .sort((a, b) => {
                   if (a === "none") return 1;
                   if (b === "none") return -1;
@@ -135,7 +114,7 @@ export default function ClassificationSelectionDialog({
                   <SelectorItem
                     key={category}
                     className="flex cursor-pointer gap-2 smart-capitalize"
-                    onClick={() => onCategorizeImage(category)}
+                    onClick={() => onSelectCategory(category)}
                   >
                     {category === "none"
                       ? t("details.none")
@@ -152,7 +131,7 @@ export default function ClassificationSelectionDialog({
             </div>
           </SelectorContent>
         </Selector>
-        <TooltipContent>{t("categorizeImage")}</TooltipContent>
+        <TooltipContent>{t("reclassifyImage")}</TooltipContent>
       </Tooltip>
     </div>
   );

@@ -50,6 +50,7 @@ import { LuPencil, LuTrash2 } from "react-icons/lu";
 import { toast } from "sonner";
 import useSWR from "swr";
 import ClassificationSelectionDialog from "@/components/overlay/ClassificationSelectionDialog";
+import ReclassifySelectionDialog from "@/components/overlay/ReclassifySelectionDialog";
 import { TbCategoryPlus } from "react-icons/tb";
 import BlurredIconButton from "@/components/button/BlurredIconButton";
 import { useModelState } from "@/api/ws";
@@ -980,19 +981,15 @@ function DatasetGrid({
   const renderDatasetActions = useCallback(
     (image: string) => (
       <>
-        <ClassificationSelectionDialog
+        <ReclassifySelectionDialog
           classes={classes}
-          modelName={modelName}
-          image={image}
-          excludeCategory={categoryName}
-          dialogLabel={t("reclassifyImageAs")}
-          tooltipLabel={t("reclassifyImage")}
-          onCategorize={(newCat) => onReclassify(image, newCat)}
+          currentCategory={categoryName}
+          onReclassify={(newCat) => onReclassify(image, newCat)}
         >
           <BlurredIconButton>
             <TbCategoryPlus className="size-5" />
           </BlurredIconButton>
-        </ClassificationSelectionDialog>
+        </ReclassifySelectionDialog>
         <Tooltip>
           <TooltipTrigger>
             <LuTrash2
